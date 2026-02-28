@@ -1,0 +1,14 @@
+#!/command/with-contenv sh
+set -eu
+
+log_file=/tmp/atom/log/nginx.log
+
+tail -n0 -F "${log_file}" &
+tail_pid=$!
+
+cat
+status=$?
+
+kill "${tail_pid}" 2>/dev/null || true
+wait "${tail_pid}" 2>/dev/null || true
+exit "${status}"
