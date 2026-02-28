@@ -23,7 +23,8 @@ docker run --rm -p 8080:8080 \
 
 Open `http://localhost:8080`.
 
-Use `--network <name>` if MySQL/Elasticsearch are running in another Docker network.
+Use `--network <name>` if MySQL/Elasticsearch are running in another Docker
+network.
 
 ## Quick debug shell
 

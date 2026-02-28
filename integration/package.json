@@ -1,0 +1,11 @@
+{
+  "name": "atbox-integration",
+  "private": true,
+  "description": "Integration harness dependencies for atbox",
+  "scripts": {
+    "smoke": "node ./smoke/playwright-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.51.1"
+  }
+}

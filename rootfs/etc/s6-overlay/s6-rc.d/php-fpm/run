@@ -1,0 +1,4 @@
+#!/command/with-contenv sh
+set -eu
+
+exec /command/s6-setuidgid "${ATBOX_RUNTIME_USER:-atbox}" php-fpm --nodaemonize -O --fpm-config /usr/local/etc/php-fpm.d/atom.conf

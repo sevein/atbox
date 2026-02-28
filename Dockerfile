@@ -92,7 +92,6 @@ RUN set -eux; \
     composer install --no-dev --prefer-dist --no-interaction; \
     rm -rf /var/www/html; \
     mkdir -p /run/nginx /var/log/nginx /var/lib/nginx /var/cache/nginx /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log; \
-    touch /tmp/atom/log/nginx.log /tmp/atom/log/php-fpm.log; \
     chown -R atbox:atbox /run/nginx /var/log/nginx /var/lib/nginx /var/cache/nginx /tmp/atom /atom/src/cache /atom/src/log
 
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
@@ -110,7 +109,7 @@ RUN set -eux; \
       *) echo "Unsupported runtime arch: ${arch}" >&2; exit 1 ;; \
     esac; \
     rm -f /tmp/s6-overlay-*.tar.xz; \
-    chmod +x /etc/cont-init.d/10-bootstrap-atom /etc/services.d/php-fpm/run /etc/services.d/php-fpm/log/run /etc/services.d/nginx/run /etc/services.d/nginx/log/run /usr/local/bin/atbox-bootstrap.php
+    chmod +x /etc/cont-init.d/10-bootstrap-atom /etc/s6-overlay/s6-rc.d/php-fpm/run /etc/s6-overlay/s6-rc.d/nginx/run /usr/local/bin/atbox-bootstrap.php
 
 EXPOSE 8080
 STOPSIGNAL SIGTERM

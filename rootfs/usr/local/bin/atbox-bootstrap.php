@@ -82,9 +82,7 @@ writeFile(
 all:
   upload_limit: -1
   download_timeout: 10
-  cache_engine: sfFileCache
-  cache_engine_param:
-    cache_dir: /tmp/atom/cache/app
+  cache_engine: sfAPCCache
   read_only: true
   htmlpurifier_enabled: false
   csp:
@@ -121,6 +119,18 @@ dev:
       session_name: symfony
       session_cookie_httponly: true
       session_cookie_secure: true
+
+all:
+  logger:
+    class: sfAggregateLogger
+    param:
+      level: warning
+      loggers:
+        sf_file:
+          class: sfStreamLogger
+          param:
+            level: warning
+            stream: php://stderr
 
 YAML
 );
@@ -224,7 +234,6 @@ error_log = /tmp/atom/log/php-fpm.log
 daemonize = no
 
 [atom]
-access.log = /tmp/atom/log/php-fpm.log
 clear_env = no
 catch_workers_output = yes
 listen = 127.0.0.1:9000
@@ -244,5 +253,5 @@ fwrite(STDOUT, "atbox php bootstrap complete\n");
 fwrite(STDOUT, "  read-only: true\n");
 fwrite(STDOUT, "  mysql dsn: {$config['atom.mysql_dsn']}\n");
 fwrite(STDOUT, "  elasticsearch: {$config['atom.elasticsearch_host']}\n");
-fwrite(STDOUT, "  cache/session backend: local filesystem (/tmp/atom/cache/app)\n");
+fwrite(STDOUT, "  cache/session backend: sfAPCCache + sfSessionStorage\n");
 fwrite(STDOUT, "  php profile: UTC, memory_limit=512M, max_execution_time=120\n");
