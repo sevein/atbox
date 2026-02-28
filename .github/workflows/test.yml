@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PROJECT_NAME: atbox-integration
+      KEEP_UP: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run integration harness
+        run: ./integration/run.sh
+      - name: Collect compose diagnostics
+        if: always()
+        run: |
+          mkdir -p integration/output
+          docker compose -p "${PROJECT_NAME}" -f integration/docker-compose.yml ps -a > integration/output/compose-ps.txt || true
+          docker compose -p "${PROJECT_NAME}" -f integration/docker-compose.yml logs --no-color > integration/output/compose-logs.txt || true
+      - name: Upload integration artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4.6.2
+        with:
+          name: integration-output
+          path: integration/output
+          if-no-files-found: warn
+      - name: Tear down integration stack
+        if: always()
+        run: |
+          docker compose -p "${PROJECT_NAME}" -f integration/docker-compose.yml down -v --remove-orphans || true

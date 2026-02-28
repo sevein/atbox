@@ -1,4 +1,10 @@
 #!/command/with-contenv sh
 set -eu
 
-exec /usr/local/bin/atbox-bootstrap.php
+/usr/local/bin/atbox-bootstrap.php
+
+runtime_user="${ATBOX_RUNTIME_USER:-atbox}"
+if ! chown -R "${runtime_user}:${runtime_user}" /tmp/atom /atom/src/cache /atom/src/log 2>/tmp/atbox-chown.err; then
+  echo "atbox bootstrap: skipping runtime chown (insufficient privilege), continuing" >&2
+  head -n 1 /tmp/atbox-chown.err >&2 || true
+fi

@@ -34,8 +34,11 @@ RUN set -eux; \
 
 FROM php:8.3-fpm-bookworm AS runtime
 ARG S6_OVERLAY_VERSION
+ARG ATBOX_UID=10001
+ARG ATBOX_GID=10001
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
-    S6_BEHAVIOUR_IF_STAGE2_FAILS=2
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    ATBOX_RUNTIME_USER=atbox
 
 RUN set -eux; \
     apt-get update; \
@@ -76,6 +79,10 @@ RUN set -eux; \
     apt-get purge -y --auto-remove autoconf g++ make pkg-config; \
     rm -rf /var/lib/apt/lists/*
 
+RUN set -eux; \
+    groupadd --system --gid "${ATBOX_GID}" atbox; \
+    useradd --system --uid "${ATBOX_UID}" --gid atbox --create-home --home-dir /home/atbox --shell /usr/sbin/nologin atbox
+
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY --from=frontend-builder /atom/src /atom/src
 
@@ -84,7 +91,8 @@ WORKDIR /atom/src
 RUN set -eux; \
     composer install --no-dev --prefer-dist --no-interaction; \
     rm -rf /var/www/html; \
-    mkdir -p /run/nginx /var/log/nginx
+    mkdir -p /run/nginx /var/log/nginx /var/lib/nginx /var/cache/nginx /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log; \
+    chown -R atbox:atbox /run/nginx /var/log/nginx /var/lib/nginx /var/cache/nginx /tmp/atom /atom/src/cache /atom/src/log
 
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY rootfs/ /
@@ -101,8 +109,8 @@ RUN set -eux; \
       *) echo "Unsupported runtime arch: ${arch}" >&2; exit 1 ;; \
     esac; \
     rm -f /tmp/s6-overlay-*.tar.xz; \
-    chmod +x /etc/cont-init.d/10-bootstrap-atom /etc/services.d/php-fpm/run /etc/services.d/nginx/run /usr/local/bin/atbox-bootstrap.php
+    chmod +x /etc/cont-init.d/10-bootstrap-atom /etc/s6-overlay/s6-rc.d/php-fpm/run /etc/s6-overlay/s6-rc.d/nginx/run /usr/local/bin/atbox-bootstrap.php
 
-EXPOSE 80
+EXPOSE 8080
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]

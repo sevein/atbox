@@ -28,9 +28,15 @@ function hostPort(string $value, int $defaultPort): array
     ];
 }
 
+function phpSingleQuoted(string $value): string
+{
+    return str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
+}
+
 function writeFile(string $path, string $contents): void
 {
     $dir = dirname($path);
+
     if (!is_dir($dir)) {
         mkdir($dir, 0775, true);
     }
@@ -50,38 +56,34 @@ if (!is_dir(ATOM_DIR)) {
     exit(1);
 }
 
-// Seed generated files expected by AtoM when missing.
 if (!file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml') && file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl')) {
     copy(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl', ATOM_DIR.'/apps/qubit/config/settings.yml');
 }
+
 if (!file_exists(ATOM_DIR.'/config/appChallenge.yml') && file_exists(ATOM_DIR.'/config/appChallenge.yml.tmpl')) {
     copy(ATOM_DIR.'/config/appChallenge.yml.tmpl', ATOM_DIR.'/config/appChallenge.yml');
 }
+
 if (file_exists(ATOM_DIR.'/config/propel.ini.tmpl')) {
     copy(ATOM_DIR.'/config/propel.ini.tmpl', ATOM_DIR.'/config/propel.ini');
 }
 
 $elasticsearch = hostPort($config['atom.elasticsearch_host'], 9200);
-$readOnlyText = 'true';
-$fpmReadOnly = 'on';
-$gearmanCompatHost = '127.0.0.1:4730';
 
-// Keep this file for compatibility, but atbox never runs Gearman.
+// Keep this file present because some AtoM code paths expect it, even in read-only deployments.
 writeFile(
     ATOM_DIR.'/apps/qubit/config/gearman.yml',
-    "all:\n  servers:\n    default: {$gearmanCompatHost}\n"
+    "all:\n  servers:\n    default: 127.0.0.1:4730\n"
 );
 
 writeFile(
     ATOM_DIR.'/apps/qubit/config/app.yml',
-    <<<YAML
+    <<<'YAML'
 all:
   upload_limit: -1
   download_timeout: 10
-  cache_engine: sfFileCache
-  cache_engine_param:
-    cache_dir: /tmp/atom/cache/app
-  read_only: {$readOnlyText}
+  cache_engine: sfAPCCache
+  read_only: true
   htmlpurifier_enabled: false
   csp:
     response_header: Content-Security-Policy
@@ -101,7 +103,7 @@ YAML
 
 writeFile(
     ATOM_DIR.'/apps/qubit/config/factories.yml',
-    <<<YAML
+    <<<'YAML'
 prod:
   storage:
     class: sfSessionStorage
@@ -118,6 +120,18 @@ dev:
       session_cookie_httponly: true
       session_cookie_secure: true
 
+all:
+  logger:
+    class: sfAggregateLogger
+    param:
+      level: warning
+      loggers:
+        sf_file:
+          class: sfStreamLogger
+          param:
+            level: warning
+            stream: php://stderr
+
 YAML
 );
 
@@ -132,6 +146,10 @@ all:
 YAML
 );
 
+$mysqlDsn = phpSingleQuoted($config['atom.mysql_dsn']);
+$mysqlUser = phpSingleQuoted($config['atom.mysql_username']);
+$mysqlPassword = phpSingleQuoted($config['atom.mysql_password']);
+
 writeFile(
     ATOM_DIR.'/config/config.php',
     <<<PHP
@@ -145,9 +163,9 @@ return [
                 'encoding' => 'utf8mb4',
                 'persistent' => true,
                 'pooling' => true,
-                'dsn' => '{$config['atom.mysql_dsn']}',
-                'username' => '{$config['atom.mysql_username']}',
-                'password' => '{$config['atom.mysql_password']}',
+                'dsn' => '{$mysqlDsn}',
+                'username' => '{$mysqlUser}',
+                'password' => '{$mysqlPassword}',
             ],
         ],
     ],
@@ -180,7 +198,9 @@ return [
 PHP
 );
 
-$phpIni = <<<INI
+writeFile(
+    ETC_DIR.'/php/php.ini',
+    <<<'INI'
 [PHP]
 output_buffering = 4096
 expose_php = off
@@ -203,38 +223,35 @@ opcache.fast_shutdown = on
 opcache.max_accelerated_files = 10000
 opcache.validate_timestamps = off
 
-INI;
+INI
+);
 
-writeFile(ETC_DIR.'/php/php.ini', $phpIni);
-
-$fpmIni = <<<FPM
+writeFile(
+    ETC_DIR.'/php-fpm.d/atom.conf',
+    <<<FPM
 [global]
-error_log = /proc/self/fd/2
+error_log = /tmp/atom/log/php-fpm.log
 daemonize = no
 
 [atom]
-access.log = /proc/self/fd/2
 clear_env = no
 catch_workers_output = yes
-user = root
-group = root
 listen = 127.0.0.1:9000
 pm = dynamic
 pm.max_children = 5
 pm.start_servers = 2
 pm.min_spare_servers = 1
 pm.max_spare_servers = 3
-env[ATOM_READ_ONLY] = "{$fpmReadOnly}"
+env[ATOM_READ_ONLY] = "on"
 
-FPM;
-
-writeFile(ETC_DIR.'/php-fpm.d/atom.conf', $fpmIni);
+FPM
+);
 
 @symlink(ATOM_DIR.'/vendor/symfony/data/web/sf', ATOM_DIR.'/sf');
 
 fwrite(STDOUT, "atbox php bootstrap complete\n");
-fwrite(STDOUT, "  read-only: on\n");
+fwrite(STDOUT, "  read-only: true\n");
 fwrite(STDOUT, "  mysql dsn: {$config['atom.mysql_dsn']}\n");
 fwrite(STDOUT, "  elasticsearch: {$config['atom.elasticsearch_host']}\n");
-fwrite(STDOUT, "  cache/session backend: local filesystem\n");
+fwrite(STDOUT, "  cache/session backend: sfAPCCache + sfSessionStorage\n");
 fwrite(STDOUT, "  php profile: UTC, memory_limit=512M, max_execution_time=120\n");
