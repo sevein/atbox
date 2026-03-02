@@ -230,12 +230,15 @@ writeFile(
     ETC_DIR.'/php-fpm.d/atom.conf',
     <<<FPM
 [global]
-error_log = /tmp/atom/log/php-fpm.log
+error_log = /dev/null
 daemonize = no
+log_limit = 8192
 
 [atom]
 clear_env = no
 catch_workers_output = yes
+decorate_workers_output = no
+access.log = /dev/null
 listen = 127.0.0.1:9000
 pm = dynamic
 pm.max_children = 5
