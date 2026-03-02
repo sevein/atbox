@@ -121,6 +121,25 @@ dev:
       session_cookie_secure: true
 
 all:
+  i18n:
+    class: sfTranslateI18N
+    param:
+      cache:
+        class: sfFileCache
+        param:
+          automatic_cleaning_factor: 0
+          cache_dir: %SF_TEMPLATE_CACHE_DIR%
+          lifetime: 86400
+          prefix: %SF_APP_DIR%/template
+
+  view_cache:
+    class: sfFileCache
+    param:
+      automatic_cleaning_factor: 0
+      cache_dir: %SF_TEMPLATE_CACHE_DIR%
+      lifetime: 86400
+      prefix: %SF_APP_DIR%/template
+
   logger:
     class: sfAggregateLogger
     param:
@@ -218,7 +237,7 @@ file_uploads = Off
 upload_max_filesize = 0
 max_file_uploads = 0
 date.timezone = UTC
-session.use_only_cookies = off
+session.use_only_cookies = on
 opcache.fast_shutdown = on
 opcache.max_accelerated_files = 10000
 opcache.validate_timestamps = off
