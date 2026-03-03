@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 const ATOM_DIR = '/atom/src';
-const PHP_VERSION = '8.3';
+const PHP_SERIES = '8.3';
 
 function envOrFail(string $name): string
 {
@@ -218,7 +218,7 @@ PHP
 );
 
 writeFile(
-    '/etc/php/'.PHP_VERSION.'/mods-available/atbox.ini',
+    '/etc/php/'.PHP_SERIES.'/mods-available/atbox.ini',
     <<<'INI'
 [PHP]
 output_buffering = 4096
@@ -245,11 +245,11 @@ opcache.validate_timestamps = off
 INI
 );
 
-@symlink('/etc/php/'.PHP_VERSION.'/mods-available/atbox.ini', '/etc/php/'.PHP_VERSION.'/cli/conf.d/99-atbox.ini');
-@symlink('/etc/php/'.PHP_VERSION.'/mods-available/atbox.ini', '/etc/php/'.PHP_VERSION.'/fpm/conf.d/99-atbox.ini');
+@symlink('/etc/php/'.PHP_SERIES.'/mods-available/atbox.ini', '/etc/php/'.PHP_SERIES.'/cli/conf.d/99-atbox.ini');
+@symlink('/etc/php/'.PHP_SERIES.'/mods-available/atbox.ini', '/etc/php/'.PHP_SERIES.'/fpm/conf.d/99-atbox.ini');
 
 writeFile(
-    '/etc/php/'.PHP_VERSION.'/fpm/pool.d/atom.conf',
+    '/etc/php/'.PHP_SERIES.'/fpm/pool.d/atom.conf',
     <<<FPM
 [atom]
 clear_env = no
