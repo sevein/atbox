@@ -18,6 +18,7 @@ using:
 - Elasticsearch index bootstrap (`php symfony search:populate`)
 - session shareability across replicas (seed session on `:18080`, validate marker
   on `:18081` using the same session cookie)
+- edge enforcement that blocks non-`GET/HEAD` methods
 - zero-result search query path (confirms search requests hit Elasticsearch
   without backend errors)
 - runtime hardening guardrails (`no-new-privileges`, dropped Linux capability

@@ -40,12 +40,31 @@ read-mostly workloads.
 
 ### Cache architecture decisions
 
-- Application cache: use `sfMemcacheCache` backed by external Memcached.
-- Opcode cache: keep PHP OPcache enabled as an in-process cache.
-- Session storage: use `QubitCacheSessionStorage` backed by Memcached for
-  replica-safe sessions without affinity.
-- Tenant isolation: use `ATOM_NAMESPACE` to scope both cache keys and session
-  cookie name.
+`atbox` uses external Memcached for application cache and session storage, and
+keeps PHP OPcache as an in-process opcode cache. `ATOM_NAMESPACE` scopes both
+cache keys and the session cookie name.
+
+### HTTP method policy
+
+In this public read-only profile, `nginx` allows only `GET` and `HEAD` requests
+at the edge and rejects all other HTTP methods.
+
+### Artifact generation policy
+
+The read-only profile is for serving existing artifacts, not for anonymous
+report-generation workflows that enqueue jobs and create new files under
+`downloads/reports`. If you need report, finding-aid, or export generation,
+run those workflows in a separate authenticated writer/admin tier.
+
+### Shared media storage model
+
+In multi-instance deployments, `uploads/` should use shared durable storage (for
+example NFS), and `downloads/` should be shared only if generated artifacts
+must be available from every instance. Public read-only instances should mount
+these paths as read-only, while the writer/admin tier should be the only one
+with read-write mounts. Native object-storage semantics are not first-class in
+this image yet, so object storage currently requires an external integration
+layer; upstream support remains a future direction.
 
 ## Operational profile
 
@@ -62,6 +81,10 @@ orchestrate environment-specific migration workflows (for example SQL dump
 import, one-time Elasticsearch population, or cross-service idempotency/state
 tracking). That transitional/bootstrap logic belongs outside this image so the
 `atbox` runtime remains simple, stable, and reusable across environments.
+
+In read-only environments, exposing existing files from `uploads/*` and
+`downloads/*` is expected; creating new user-triggered artifacts from anonymous
+requests is not part of the supported profile.
 
 ## Run
 

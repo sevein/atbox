@@ -342,6 +342,36 @@ assert_search_zero_results() {
   echo "Search assertions passed (${search_url})"
 }
 
+assert_non_get_methods_blocked() {
+  local -a routes
+  local route status
+
+  routes=(
+    "/"
+    "/index.php"
+    "/index.php/informationobject/browse"
+    "/index.php/informationobject/itemOrFileList"
+    "/index.php/informationobject/storageLocations"
+    "/index.php/informationobject/boxLabel"
+  )
+
+  for route in "${routes[@]}"; do
+    status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${ATBOX_URL%/}${route}" || true)"
+    if [[ "${status}" != "403" ]]; then
+      echo "Expected HTTP 403 for blocked non-GET request on primary (${route}), got ${status}"
+      return 1
+    fi
+
+    status="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${ATBOX_REPLICA_URL%/}${route}" || true)"
+    if [[ "${status}" != "403" ]]; then
+      echo "Expected HTTP 403 for blocked non-GET request on replica (${route}), got ${status}"
+      return 1
+    fi
+  done
+
+  echo "Non-GET method block assertions passed (primary + replica)"
+}
+
 echo "Starting dependencies (mysql + elasticsearch + memcached)"
 compose up -d mysql elasticsearch memcached
 wait_for_healthy mysql 240
@@ -365,6 +395,7 @@ assert_no_tail_loggers "${ATBOX_REPLICA_SERVICE}"
 
 bootstrap_search_index
 assert_session_shareability
+assert_non_get_methods_blocked
 
 run_playwright_smoke
 assert_search_zero_results
