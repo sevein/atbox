@@ -62,6 +62,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       php${PHP_VERSION}-intl \
       php${PHP_VERSION}-mbstring \
       php${PHP_VERSION}-mysql \
+      php${PHP_VERSION}-memcache \
       php${PHP_VERSION}-opcache \
       php${PHP_VERSION}-xsl \
       php${PHP_VERSION}-zip \
@@ -94,8 +95,7 @@ ARG PHP_VERSION
 ARG ATBOX_UID=10001
 ARG ATBOX_GID=10001
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
-    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
-    ATBOX_RUNTIME_USER=atbox
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 
 RUN set -eux; \
     groupadd --system --gid "${ATBOX_GID}" atbox; \

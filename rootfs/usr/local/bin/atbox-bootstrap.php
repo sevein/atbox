@@ -18,6 +18,17 @@ function envOrFail(string $name): string
     return $value;
 }
 
+function envOrDefault(string $name, string $default): string
+{
+    $value = getenv($name);
+
+    if (false === $value || '' === $value) {
+        return $default;
+    }
+
+    return $value;
+}
+
 function hostPort(string $value, int $defaultPort): array
 {
     $parts = explode(':', $value, 2);
@@ -46,6 +57,8 @@ function writeFile(string $path, string $contents): void
 
 $config = [
     'atom.elasticsearch_host' => envOrFail('ATOM_ELASTICSEARCH_HOST'),
+    'atom.memcached_host' => envOrFail('ATOM_MEMCACHED_HOST'),
+    'atom.namespace' => envOrDefault('ATOM_NAMESPACE', 'atom'),
     'atom.mysql_dsn' => envOrFail('ATOM_MYSQL_DSN'),
     'atom.mysql_username' => envOrFail('ATOM_MYSQL_USERNAME'),
     'atom.mysql_password' => envOrFail('ATOM_MYSQL_PASSWORD'),
@@ -53,6 +66,16 @@ $config = [
 
 if (!is_dir(ATOM_DIR)) {
     fwrite(STDERR, 'AtoM source tree not found at '.ATOM_DIR."\n");
+    exit(1);
+}
+
+if (!class_exists('Memcache')) {
+    fwrite(STDERR, "PHP Memcache extension is required (class Memcache not found)\n");
+    exit(1);
+}
+
+if (!preg_match('/^[A-Za-z0-9_-]+$/', $config['atom.namespace'])) {
+    fwrite(STDERR, "ATOM_NAMESPACE may contain only letters, numbers, '_' or '-'\n");
     exit(1);
 }
 
@@ -69,6 +92,7 @@ if (file_exists(ATOM_DIR.'/config/propel.ini.tmpl')) {
 }
 
 $elasticsearch = hostPort($config['atom.elasticsearch_host'], 9200);
+$memcached = hostPort($config['atom.memcached_host'], 11211);
 
 // Keep this file present because some AtoM code paths expect it, even in read-only deployments.
 writeFile(
@@ -78,11 +102,17 @@ writeFile(
 
 writeFile(
     ATOM_DIR.'/apps/qubit/config/app.yml',
-    <<<'YAML'
+    <<<YAML
 all:
   upload_limit: -1
   download_timeout: 10
-  cache_engine: sfAPCCache
+  cache_engine: sfMemcacheCache
+  cache_engine_param:
+    host: {$memcached['host']}
+    port: {$memcached['port']}
+    prefix: {$config['atom.namespace']}
+    storeCacheInfo: true
+    persistent: true
   read_only: true
   htmlpurifier_enabled: false
   csp:
@@ -97,28 +127,43 @@ all:
       worker-src 'self' blob:;
       connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.googleapis.com *.google.com https://*.gstatic.com data: blob:;
       frame-ancestors 'self';
-
 YAML
 );
 
 writeFile(
     ATOM_DIR.'/apps/qubit/config/factories.yml',
-    <<<'YAML'
+    <<<YAML
 prod:
   storage:
-    class: sfSessionStorage
+    class: QubitCacheSessionStorage
     param:
-      session_name: symfony
+      session_name: {$config['atom.namespace']}
       session_cookie_httponly: true
       session_cookie_secure: true
+      cache:
+        class: sfMemcacheCache
+        param:
+          host: {$memcached['host']}
+          port: {$memcached['port']}
+          prefix: {$config['atom.namespace']}
+          storeCacheInfo: true
+          persistent: true
 
 dev:
   storage:
-    class: sfSessionStorage
+    class: QubitCacheSessionStorage
     param:
-      session_name: symfony
+      session_name: {$config['atom.namespace']}
       session_cookie_httponly: true
       session_cookie_secure: true
+      cache:
+        class: sfMemcacheCache
+        param:
+          host: {$memcached['host']}
+          port: {$memcached['port']}
+          prefix: {$config['atom.namespace']}
+          storeCacheInfo: true
+          persistent: true
 
 all:
   i18n:
@@ -150,7 +195,6 @@ all:
           param:
             level: warning
             stream: php://stderr
-
 YAML
 );
 
@@ -270,8 +314,3 @@ FPM
 @symlink(ATOM_DIR.'/vendor/symfony/data/web/sf', ATOM_DIR.'/sf');
 
 fwrite(STDOUT, "atbox php bootstrap complete\n");
-fwrite(STDOUT, "  read-only: true\n");
-fwrite(STDOUT, "  mysql dsn: {$config['atom.mysql_dsn']}\n");
-fwrite(STDOUT, "  elasticsearch: {$config['atom.elasticsearch_host']}\n");
-fwrite(STDOUT, "  cache/session backend: sfAPCCache + sfSessionStorage\n");
-fwrite(STDOUT, "  php profile: UTC, memory_limit=512M, max_execution_time=120\n");
