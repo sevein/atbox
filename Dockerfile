@@ -15,6 +15,7 @@ RUN set -eux; \
 
 FROM debian:bookworm-slim AS atom-source
 ARG ATOM_VERSION
+ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     set -eux; \
@@ -41,6 +42,7 @@ RUN set -eux; \
 
 FROM debian:bookworm-slim AS runtime-base
 ARG PHP_VERSION
+ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     set -eux; \

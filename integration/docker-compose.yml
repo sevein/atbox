@@ -2,6 +2,10 @@ name: atbox-integration
 
 x-atbox-common: &atbox-common
   image: atbox:integration
+  pull_policy: never
+  build:
+    context: ..
+    dockerfile: Dockerfile
   cap_drop:
     - NET_RAW
   security_opt:
@@ -65,9 +69,6 @@ services:
     command: ["-m", "128", "-p", "11211"]
 
   atbox:
-    build:
-      context: ..
-      dockerfile: Dockerfile
     <<: *atbox-common
     ports:
       - "18080:8080"
