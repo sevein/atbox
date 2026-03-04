@@ -5,15 +5,19 @@ using:
 
 - `mysql:8.4.8-oraclelinux9`
 - `docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2`
-- local `atbox` image built from this repository
+- `memcached:1.6.39-bookworm`
+- local `atbox` image built from this repository (started as two services:
+  `atbox` + `atbox_replica`)
 
 ## What it validates
 
 - stack boot order and dependency readiness
 - SQL dump import into MySQL
-- AtoM page load over HTTP
+- AtoM page load over HTTP on both `atbox` replicas
 - browser-level smoke check via Playwright Node script (`npm run smoke`)
 - Elasticsearch index bootstrap (`php symfony search:populate`)
+- session shareability across replicas (seed session on `:18080`, validate marker
+  on `:18081` using the same session cookie)
 - zero-result search query path (confirms search requests hit Elasticsearch
   without backend errors)
 - runtime hardening guardrails (`no-new-privileges`, dropped Linux capability
@@ -39,6 +43,8 @@ Defaults:
 
 - `DUMP_SQL=integration/fixtures/dump.sql`
 - `ATBOX_URL=http://127.0.0.1:18080/`
+- `ATBOX_REPLICA_URL=http://127.0.0.1:18081/`
+- `ATOM_NAMESPACE=atbox-it`
 - `PROJECT_NAME=atbox-it`
 - `KEEP_UP=0` (auto teardown)
 
