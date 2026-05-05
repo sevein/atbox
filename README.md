@@ -10,6 +10,19 @@ production-oriented container focused on read-only access patterns.
 - Support read-only browsing workloads backed by external MySQL, Elasticsearch
   and Memcached.
 
+The repository now builds a small role-based image family from the same AtoM
+source and dependency layers:
+
+- `ghcr.io/sevein/atbox`: public read-only web runtime.
+- `ghcr.io/sevein/atbox-admin`: authenticated metadata-editing web runtime.
+- `ghcr.io/sevein/atbox-cli`: lifecycle/CLI runtime for one-shot jobs.
+
+> [!WARNING]
+> The current admin image supports the first metadata-editing milestone only:
+> login, legacy form `POST`, and simple record creation. Uploads, Gearman
+> workers, derivatives, exports, reports, finding aids, and other job-backed
+> legacy AtoM workflows are not supported by this image family yet.
+
 ## Design principles
 
 ### Monolithic runtime unit
@@ -38,6 +51,14 @@ read-mostly workloads.
 - Uploads are disabled at PHP level.
 - Session and cache behavior are explicitly configured for this profile.
 
+### Admin application behavior
+
+`atbox-admin` is a separate image target, not a runtime switch on the public
+image. It enables AtoM write behavior and accepts legacy form `POST` requests,
+but the first supported admin milestone is metadata editing only. Uploads,
+workers, Gearman, and job-backed derivative/export workflows remain outside this
+image for now.
+
 ### Cache architecture decisions
 
 `atbox` uses external Memcached for application cache and session storage, and
@@ -53,18 +74,18 @@ at the edge and rejects all other HTTP methods.
 
 The read-only profile is for serving existing artifacts, not for anonymous
 report-generation workflows that enqueue jobs and create new files under
-`downloads/reports`. If you need report, finding-aid, or export generation,
-run those workflows in a separate authenticated writer/admin tier.
+`downloads/reports`. If you need report, finding-aid, or export generation, run
+those workflows in a separate authenticated writer/admin tier.
 
 ### Shared media storage model
 
 In multi-instance deployments, `uploads/` should use shared durable storage (for
-example NFS), and `downloads/` should be shared only if generated artifacts
-must be available from every instance. Public read-only instances should mount
-these paths as read-only, while the writer/admin tier should be the only one
-with read-write mounts. Native object-storage semantics are not first-class in
-this image yet, so object storage currently requires an external integration
-layer; upstream support remains a future direction.
+example NFS), and `downloads/` should be shared only if generated artifacts must
+be available from every instance. Public read-only instances should mount these
+paths as read-only, while the writer/admin tier should be the only one with
+read-write mounts. Native object-storage semantics are not first-class in this
+image yet, so object storage currently requires an external integration layer;
+upstream support remains a future direction.
 
 ## Operational profile
 
@@ -72,6 +93,9 @@ layer; upstream support remains a future direction.
 - Runtime user: `atbox` (UID/GID configurable)
 - External dependencies: MySQL + Elasticsearch + Memcached
 - Process supervision: `s6-overlay`
+
+`atbox-cli` does not run `s6-overlay`; it bootstraps the same AtoM config and
+then executes the supplied command, for example `php symfony search:populate`.
 
 ## Scope and non-goals
 
@@ -105,11 +129,26 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 
 ## Configuration reference
 
-| Variable | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `ATOM_ELASTICSEARCH_HOST` | Yes | none | Elasticsearch endpoint (`host[:port]`). |
-| `ATOM_MEMCACHED_HOST` | Yes | none | Memcached endpoint (`host[:port]`). |
-| `ATOM_MYSQL_DSN` | Yes | none | PDO DSN for MySQL. |
-| `ATOM_MYSQL_USERNAME` | Yes | none | MySQL username. |
-| `ATOM_MYSQL_PASSWORD` | Yes | none | MySQL password. |
-| `ATOM_NAMESPACE` | No | `atom` | Shared namespace used for both Memcached key prefix and session cookie name. Set per tenant/deployment to avoid cross-tenant collisions. |
+| Variable                       | Required   | Default          | Notes                                                                                           |
+| ------------------------------ | ---------- | ---------------- | ----------------------------------------------------------------------------------------------- |
+| `ATOM_ELASTICSEARCH_HOST`      | Yes        | none             | Elasticsearch endpoint (`host[:port]`).                                                         |
+| `ATOM_MEMCACHED_HOST`          | Yes        | none             | Memcached endpoint (`host[:port]`).                                                             |
+| `ATOM_MYSQL_DSN`               | Yes        | none             | PDO DSN for MySQL.                                                                              |
+| `ATOM_MYSQL_USERNAME`          | Yes        | none             | MySQL username.                                                                                 |
+| `ATOM_MYSQL_PASSWORD`          | Yes        | none             | MySQL password.                                                                                 |
+| `ATOM_NAMESPACE`               | No         | `atom`           | Convenience default used by cache/session namespace settings when they are not set directly.    |
+| `ATOM_CACHE_NAMESPACE`         | No         | `ATOM_NAMESPACE` | Memcached key prefix. Set per tenant/deployment to avoid cache collisions.                      |
+| `ATOM_SESSION_NAME`            | No         | `ATOM_NAMESPACE` | Session cookie name. Use a distinct value when public/admin tiers should not share login state. |
+| `ATOM_SESSION_COOKIE_SECURE`   | Admin only | `true`           | Set `false` only for local plain-HTTP admin testing.                                            |
+| `ATOM_SESSION_COOKIE_SAMESITE` | Admin only | `lax`            | One of `strict`, `lax`, or `none`.                                                              |
+
+## Helm chart
+
+This repository includes a chart in `charts/atbox` for attached deployments
+where MySQL, Elasticsearch, and Memcached are provided externally. Presets are
+included for read-only, admin-only, and public-plus-admin topologies:
+
+```bash
+helm template atbox charts/atbox \
+  --values charts/atbox/values-public-plus-admin.yaml
+```

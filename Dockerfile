@@ -91,7 +91,9 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
     set -eux; \
     composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-FROM runtime-base AS runtime
+FROM composer-deps AS atom-app
+
+FROM runtime-base AS web-base
 ARG S6_OVERLAY_VERSION
 ARG PHP_VERSION
 ARG ATBOX_UID=10001
@@ -103,7 +105,7 @@ RUN set -eux; \
     groupadd --system --gid "${ATBOX_GID}" atbox; \
     useradd --system --uid "${ATBOX_UID}" --gid atbox --create-home --home-dir /home/atbox --shell /usr/sbin/nologin atbox
 
-COPY --from=composer-deps /atom/src /atom/src
+COPY --from=atom-app /atom/src /atom/src
 
 WORKDIR /atom/src
 
@@ -113,7 +115,7 @@ RUN set -eux; \
     chown -R atbox:atbox /run/nginx /var/log/nginx /var/lib/nginx /var/cache/nginx /tmp/atom /atom/src/cache /atom/src/log
 
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
-COPY rootfs/ /
+COPY rootfs/base/ /
 
 COPY --from=s6-downloader /tmp/s6-overlay-noarch.tar.xz /tmp/
 COPY --from=s6-downloader /tmp/s6-overlay-x86_64.tar.xz /tmp/s6-overlay-x86_64.tar.xz
@@ -129,6 +131,44 @@ RUN set -eux; \
     rm -f /tmp/s6-overlay-*.tar.xz; \
     chmod +x /etc/cont-init.d/10-bootstrap-atom /etc/s6-overlay/s6-rc.d/php-fpm/run /etc/s6-overlay/s6-rc.d/nginx/run /usr/local/bin/atbox-bootstrap.php
 
+FROM web-base AS readonly-runtime
+
+COPY rootfs/readonly/ /
+
 EXPOSE 8080
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]
+
+FROM web-base AS admin-runtime
+
+COPY nginx/admin.conf /etc/nginx/nginx.conf
+COPY rootfs/admin/ /
+
+EXPOSE 8080
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/init"]
+
+FROM runtime-base AS cli-runtime
+ARG ATBOX_UID=10001
+ARG ATBOX_GID=10001
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN set -eux; \
+    groupadd --system --gid "${ATBOX_GID}" atbox; \
+    useradd --system --uid "${ATBOX_UID}" --gid atbox --create-home --home-dir /home/atbox --shell /usr/sbin/nologin atbox
+
+COPY --from=atom-app /atom/src /atom/src
+COPY rootfs/base/usr/local/bin/atbox-bootstrap.php /usr/local/bin/atbox-bootstrap.php
+COPY rootfs/cli/ /
+
+WORKDIR /atom/src
+
+RUN set -eux; \
+    mkdir -p /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log; \
+    chown -R atbox:atbox /tmp/atom /atom/src/cache /atom/src/log; \
+    chmod +x /usr/local/bin/atbox-bootstrap.php /usr/local/bin/atbox-cli-entrypoint
+
+ENTRYPOINT ["/usr/local/bin/atbox-cli-entrypoint"]
+CMD ["php", "symfony", "list"]
+
+FROM readonly-runtime AS runtime

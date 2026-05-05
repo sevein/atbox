@@ -3,9 +3,12 @@
   "private": true,
   "description": "Integration harness dependencies for atbox",
   "scripts": {
-    "smoke": "node ./smoke/playwright-smoke.mjs"
+    "test": "bats --timing ./tests",
+    "public-smoke": "node ./smoke/playwright-smoke.mjs",
+    "admin-smoke": "node ./smoke/admin-metadata-smoke.mjs"
   },
   "devDependencies": {
+    "bats": "1.12.0",
     "playwright": "1.51.1"
   }
 }

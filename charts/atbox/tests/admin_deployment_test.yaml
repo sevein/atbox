@@ -1,0 +1,47 @@
+suite: admin deployment
+templates:
+  - templates/admin-deployment.yaml
+tests:
+  - it: renders no admin deployment by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the admin runtime with configurable session settings
+    set:
+      atom.admin.enabled: true
+      atom.admin.sessionName: atbox-admin-test
+      atom.admin.sessionCookieSecure: false
+      atom.admin.sessionCookieSameSite: strict
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-atbox-admin
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: atbox-admin
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/sevein/atbox-admin:2.10.1
+      - equal:
+          path: spec.template.spec.containers[0].env[7]
+          value:
+            name: ATOM_SESSION_NAME
+            value: atbox-admin-test
+      - equal:
+          path: spec.template.spec.containers[0].env[8]
+          value:
+            name: ATOM_SESSION_COOKIE_SECURE
+            value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[9]
+          value:
+            name: ATOM_SESSION_COOKIE_SAMESITE
+            value: strict
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: NET_RAW

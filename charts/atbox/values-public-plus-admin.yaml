@@ -1,0 +1,11 @@
+atom:
+  public:
+    enabled: true
+    sessionName: atom-public
+  admin:
+    enabled: true
+    sessionName: atom-admin
+
+bootstrap:
+  searchPopulate:
+    enabled: false

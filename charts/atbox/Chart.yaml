@@ -1,0 +1,6 @@
+apiVersion: v2
+name: atbox
+description: Role-based AtoM runtime images for attached deployments
+type: application
+version: 0.1.0
+appVersion: "2.10.1"

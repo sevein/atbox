@@ -4,8 +4,9 @@ x-atbox-common: &atbox-common
   image: atbox:integration
   pull_policy: never
   build:
-    context: ..
+    context: ../..
     dockerfile: Dockerfile
+    target: readonly-runtime
   cap_drop:
     - NET_RAW
   security_opt:
@@ -21,6 +22,8 @@ x-atbox-common: &atbox-common
     ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
     ATOM_MEMCACHED_HOST: memcached:11211
     ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
+    ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+    ATOM_SESSION_NAME: ${ATOM_SESSION_NAME:-atbox-it}
     ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
     ATOM_MYSQL_USERNAME: atom
     ATOM_MYSQL_PASSWORD: atom
@@ -77,6 +80,51 @@ services:
     <<: *atbox-common
     ports:
       - "18081:8080"
+
+  atbox_admin:
+    <<: *atbox-common
+    image: atbox-admin:integration
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: admin-runtime
+    environment:
+      ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+      ATOM_MEMCACHED_HOST: memcached:11211
+      ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
+      ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+      ATOM_SESSION_NAME: ${ADMIN_ATOM_SESSION_NAME:-atbox-admin-it}
+      ATOM_SESSION_COOKIE_SECURE: "false"
+      ATOM_SESSION_COOKIE_SAMESITE: lax
+      ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
+      ATOM_MYSQL_USERNAME: atom
+      ATOM_MYSQL_PASSWORD: atom
+    ports:
+      - "18082:8080"
+
+  atbox_cli:
+    image: atbox-cli:integration
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: cli-runtime
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+    environment:
+      ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+      ATOM_MEMCACHED_HOST: memcached:11211
+      ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
+      ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+      ATOM_SESSION_NAME: ${ATOM_SESSION_NAME:-atbox-it}
+      ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
+      ATOM_MYSQL_USERNAME: atom
+      ATOM_MYSQL_PASSWORD: atom
 
 volumes:
   mysql-data:

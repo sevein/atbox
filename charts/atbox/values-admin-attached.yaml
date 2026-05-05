@@ -1,0 +1,9 @@
+atom:
+  public:
+    enabled: false
+  admin:
+    enabled: true
+
+bootstrap:
+  searchPopulate:
+    enabled: false

@@ -1,0 +1,52 @@
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+external:
+  elasticsearchHost: elasticsearch:9200
+  memcachedHost: memcached:11211
+  mysqlDsn: mysql:host=mysql;dbname=atom;charset=utf8mb4
+  mysqlUsername: atom
+  mysqlPassword: atom
+
+atom:
+  namespace: atom
+  cacheNamespace: ""
+
+  public:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: ghcr.io/sevein/atbox
+      tag: ""
+      pullPolicy: IfNotPresent
+    sessionName: ""
+    service:
+      type: ClusterIP
+      port: 80
+    resources: {}
+
+  admin:
+    enabled: false
+    replicaCount: 1
+    image:
+      repository: ghcr.io/sevein/atbox-admin
+      tag: ""
+      pullPolicy: IfNotPresent
+    sessionName: atom-admin
+    sessionCookieSecure: true
+    sessionCookieSameSite: lax
+    service:
+      type: ClusterIP
+      port: 80
+    resources: {}
+
+bootstrap:
+  searchPopulate:
+    enabled: false
+    image:
+      repository: ghcr.io/sevein/atbox-cli
+      tag: ""
+      pullPolicy: IfNotPresent
+    backoffLimit: 1
+    restartPolicy: Never

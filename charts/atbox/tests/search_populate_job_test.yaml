@@ -1,0 +1,39 @@
+suite: search populate job
+templates:
+  - templates/search-populate-job.yaml
+tests:
+  - it: renders no search populate job by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the search populate job with the CLI image
+    set:
+      bootstrap.searchPopulate.enabled: true
+      bootstrap.searchPopulate.backoffLimit: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-atbox-search-populate
+      - equal:
+          path: spec.backoffLimit
+          value: 3
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: search-populate
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/sevein/atbox-cli:2.10.1
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - php
+            - symfony
+            - search:populate

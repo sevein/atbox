@@ -1,0 +1,18 @@
+{{- if .Values.atom.admin.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "atbox.fullname" . }}-admin
+  labels:
+    {{- include "atbox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+spec:
+  type: {{ .Values.atom.admin.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.atom.admin.service.port }}
+      targetPort: http
+  selector:
+    {{- include "atbox.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+{{- end }}

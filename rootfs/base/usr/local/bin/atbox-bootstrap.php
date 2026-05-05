@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 const ATOM_DIR = '/atom/src';
 const PHP_SERIES = '8.3';
+const ROLE_FILE = '/etc/atbox/role';
 
 function envOrFail(string $name): string
 {
@@ -27,6 +28,26 @@ function envOrDefault(string $name, string $default): string
     }
 
     return $value;
+}
+
+function boolEnvOrDefault(string $name, bool $default): bool
+{
+    $value = getenv($name);
+
+    if (false === $value || '' === $value) {
+        return $default;
+    }
+
+    $normalized = strtolower($value);
+    if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+        return true;
+    }
+    if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
+        return false;
+    }
+
+    fwrite(STDERR, "{$name} must be a boolean value\n");
+    exit(1);
 }
 
 function hostPort(string $value, int $defaultPort): array
@@ -55,14 +76,43 @@ function writeFile(string $path, string $contents): void
     file_put_contents($path, $contents);
 }
 
+function roleOrFail(): string
+{
+    if (!is_readable(ROLE_FILE)) {
+        fwrite(STDERR, 'atbox role file not found at '.ROLE_FILE."\n");
+        exit(1);
+    }
+
+    $role = trim((string) file_get_contents(ROLE_FILE));
+    if (!in_array($role, ['readonly', 'admin', 'cli'], true)) {
+        fwrite(STDERR, "Unsupported atbox role: {$role}\n");
+        exit(1);
+    }
+
+    return $role;
+}
+
+function yamlBool(bool $value): string
+{
+    return $value ? 'true' : 'false';
+}
+
+$role = roleOrFail();
+$legacyNamespace = envOrDefault('ATOM_NAMESPACE', 'atom');
 $config = [
     'atom.elasticsearch_host' => envOrFail('ATOM_ELASTICSEARCH_HOST'),
     'atom.memcached_host' => envOrFail('ATOM_MEMCACHED_HOST'),
-    'atom.namespace' => envOrDefault('ATOM_NAMESPACE', 'atom'),
+    'atom.cache_namespace' => envOrDefault('ATOM_CACHE_NAMESPACE', $legacyNamespace),
+    'atom.session_name' => envOrDefault('ATOM_SESSION_NAME', $legacyNamespace),
     'atom.mysql_dsn' => envOrFail('ATOM_MYSQL_DSN'),
     'atom.mysql_username' => envOrFail('ATOM_MYSQL_USERNAME'),
     'atom.mysql_password' => envOrFail('ATOM_MYSQL_PASSWORD'),
 ];
+$readOnly = 'readonly' === $role;
+$sessionCookieSecure = 'admin' === $role
+    ? boolEnvOrDefault('ATOM_SESSION_COOKIE_SECURE', true)
+    : true;
+$sessionCookieSameSite = strtolower(envOrDefault('ATOM_SESSION_COOKIE_SAMESITE', 'lax'));
 
 if (!is_dir(ATOM_DIR)) {
     fwrite(STDERR, 'AtoM source tree not found at '.ATOM_DIR."\n");
@@ -74,8 +124,15 @@ if (!class_exists('Memcache')) {
     exit(1);
 }
 
-if (!preg_match('/^[A-Za-z0-9_-]+$/', $config['atom.namespace'])) {
-    fwrite(STDERR, "ATOM_NAMESPACE may contain only letters, numbers, '_' or '-'\n");
+foreach (['ATOM_CACHE_NAMESPACE' => $config['atom.cache_namespace'], 'ATOM_SESSION_NAME' => $config['atom.session_name']] as $name => $value) {
+    if (!preg_match('/^[A-Za-z0-9_-]+$/', $value)) {
+        fwrite(STDERR, "{$name} may contain only letters, numbers, '_' or '-'\n");
+        exit(1);
+    }
+}
+
+if (!in_array($sessionCookieSameSite, ['strict', 'lax', 'none'], true)) {
+    fwrite(STDERR, "ATOM_SESSION_COOKIE_SAMESITE must be one of strict, lax, or none\n");
     exit(1);
 }
 
@@ -93,6 +150,9 @@ if (file_exists(ATOM_DIR.'/config/propel.ini.tmpl')) {
 
 $elasticsearch = hostPort($config['atom.elasticsearch_host'], 9200);
 $memcached = hostPort($config['atom.memcached_host'], 11211);
+$readOnlyYaml = yamlBool($readOnly);
+$fpmReadOnly = $readOnly ? 'on' : 'off';
+$sessionCookieSecureYaml = yamlBool($sessionCookieSecure);
 
 // Keep this file present because some AtoM code paths expect it, even in read-only deployments.
 writeFile(
@@ -110,10 +170,10 @@ all:
   cache_engine_param:
     host: {$memcached['host']}
     port: {$memcached['port']}
-    prefix: {$config['atom.namespace']}
+    prefix: {$config['atom.cache_namespace']}
     storeCacheInfo: true
     persistent: true
-  read_only: true
+  read_only: {$readOnlyYaml}
   htmlpurifier_enabled: false
   csp:
     response_header: Content-Security-Policy
@@ -137,15 +197,16 @@ prod:
   storage:
     class: QubitCacheSessionStorage
     param:
-      session_name: {$config['atom.namespace']}
+      session_name: {$config['atom.session_name']}
       session_cookie_httponly: true
-      session_cookie_secure: true
+      session_cookie_secure: {$sessionCookieSecureYaml}
+      session_cookie_samesite: {$sessionCookieSameSite}
       cache:
         class: sfMemcacheCache
         param:
           host: {$memcached['host']}
           port: {$memcached['port']}
-          prefix: {$config['atom.namespace']}
+          prefix: {$config['atom.cache_namespace']}
           storeCacheInfo: true
           persistent: true
 
@@ -153,15 +214,16 @@ dev:
   storage:
     class: QubitCacheSessionStorage
     param:
-      session_name: {$config['atom.namespace']}
+      session_name: {$config['atom.session_name']}
       session_cookie_httponly: true
-      session_cookie_secure: true
+      session_cookie_secure: {$sessionCookieSecureYaml}
+      session_cookie_samesite: {$sessionCookieSameSite}
       cache:
         class: sfMemcacheCache
         param:
           host: {$memcached['host']}
           port: {$memcached['port']}
-          prefix: {$config['atom.namespace']}
+          prefix: {$config['atom.cache_namespace']}
           storeCacheInfo: true
           persistent: true
 
@@ -306,11 +368,11 @@ pm.max_children = 5
 pm.start_servers = 2
 pm.min_spare_servers = 1
 pm.max_spare_servers = 3
-env[ATOM_READ_ONLY] = "on"
+env[ATOM_READ_ONLY] = "{$fpmReadOnly}"
 
 FPM
 );
 
 @symlink(ATOM_DIR.'/vendor/symfony/data/web/sf', ATOM_DIR.'/sf');
 
-fwrite(STDOUT, "atbox php bootstrap complete\n");
+fwrite(STDOUT, "atbox php bootstrap complete ({$role})\n");

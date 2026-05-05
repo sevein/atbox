@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "atbox Helm chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "nameOverride": {
+      "type": "string",
+      "maxLength": 63
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "maxLength": 63
+    },
+    "external": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elasticsearchHost",
+        "memcachedHost",
+        "mysqlDsn",
+        "mysqlUsername",
+        "mysqlPassword"
+      ],
+      "properties": {
+        "elasticsearchHost": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memcachedHost": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mysqlDsn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mysqlUsername": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mysqlPassword": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "atom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "cacheNamespace",
+        "public",
+        "admin"
+      ],
+      "properties": {
+        "namespace": {
+          "$ref": "#/definitions/atomName"
+        },
+        "cacheNamespace": {
+          "$ref": "#/definitions/optionalAtomName"
+        },
+        "public": {
+          "$ref": "#/definitions/webRole"
+        },
+        "admin": {
+          "$ref": "#/definitions/adminWebRole"
+        }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "searchPopulate"
+      ],
+      "properties": {
+        "searchPopulate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "image",
+            "backoffLimit",
+            "restartPolicy"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "backoffLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "restartPolicy": {
+              "type": "string",
+              "enum": [
+                "Never",
+                "OnFailure"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "atomName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "optionalAtomName": {
+      "type": "string",
+      "pattern": "^$|^[A-Za-z0-9_-]+$"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag",
+        "pullPolicy"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "port"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer",
+            "ExternalName"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "webRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "replicaCount",
+        "image",
+        "sessionName",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "sessionName": {
+          "$ref": "#/definitions/optionalAtomName"
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "adminWebRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "replicaCount",
+        "image",
+        "sessionName",
+        "sessionCookieSecure",
+        "sessionCookieSameSite",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "sessionName": {
+          "$ref": "#/definitions/optionalAtomName"
+        },
+        "sessionCookieSecure": {
+          "type": "boolean"
+        },
+        "sessionCookieSameSite": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "lax",
+            "none"
+          ]
+        },
+        "service": {
+          "$ref": "#/definitions/service"
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
