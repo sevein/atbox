@@ -1,0 +1,18 @@
+{{- if .Values.atom.public.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "atbox.fullname" . }}-public
+  labels:
+    {{- include "atbox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: public
+spec:
+  type: {{ .Values.atom.public.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.atom.public.service.port }}
+      targetPort: http
+  selector:
+    {{- include "atbox.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: public
+{{- end }}

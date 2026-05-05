@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+
+php /usr/local/bin/atbox-bootstrap.php
+
+exec "$@"

@@ -1,0 +1,45 @@
+{{- if .Values.atom.admin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atbox.fullname" . }}-admin
+  labels:
+    {{- include "atbox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+spec:
+  replicas: {{ .Values.atom.admin.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "atbox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: admin
+  template:
+    metadata:
+      labels:
+        {{- include "atbox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: admin
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: atbox-admin
+          image: "{{ .Values.atom.admin.image.repository }}:{{ default .Chart.AppVersion .Values.atom.admin.image.tag }}"
+          imagePullPolicy: {{ .Values.atom.admin.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "atbox.commonEnv" . | nindent 12 }}
+            - name: ATOM_SESSION_NAME
+              value: {{ .Values.atom.admin.sessionName | quote }}
+            - name: ATOM_SESSION_COOKIE_SECURE
+              value: {{ .Values.atom.admin.sessionCookieSecure | quote }}
+            - name: ATOM_SESSION_COOKIE_SAMESITE
+              value: {{ .Values.atom.admin.sessionCookieSameSite | quote }}
+          {{- include "atbox.podSecurityContext" . | nindent 10 }}
+          {{- with .Values.atom.admin.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

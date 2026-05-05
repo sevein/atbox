@@ -1,0 +1,41 @@
+{{- if .Values.atom.public.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atbox.fullname" . }}-public
+  labels:
+    {{- include "atbox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: public
+spec:
+  replicas: {{ .Values.atom.public.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "atbox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: public
+  template:
+    metadata:
+      labels:
+        {{- include "atbox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: public
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: atbox
+          image: "{{ .Values.atom.public.image.repository }}:{{ default .Chart.AppVersion .Values.atom.public.image.tag }}"
+          imagePullPolicy: {{ .Values.atom.public.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "atbox.commonEnv" . | nindent 12 }}
+            - name: ATOM_SESSION_NAME
+              value: {{ default .Values.atom.namespace .Values.atom.public.sessionName | quote }}
+          {{- include "atbox.podSecurityContext" . | nindent 10 }}
+          {{- with .Values.atom.public.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
