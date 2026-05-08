@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "atbox.labels" . | nindent 4 }}
     app.kubernetes.io/component: public
+  {{- with .Values.atom.public.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.atom.public.replicaCount }}
   selector:
@@ -17,6 +21,10 @@ spec:
       labels:
         {{- include "atbox.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: public
+      {{- with .Values.atom.public.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -29,6 +37,19 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          {{- if or .Values.storage.uploads.existingClaim .Values.storage.downloads.existingClaim }}
+          volumeMounts:
+            {{- if .Values.storage.uploads.existingClaim }}
+            - name: uploads
+              mountPath: /atom/src/web/uploads
+              readOnly: true
+            {{- end }}
+            {{- if .Values.storage.downloads.existingClaim }}
+            - name: downloads
+              mountPath: /atom/src/web/downloads
+              readOnly: true
+            {{- end }}
+          {{- end }}
           env:
             {{- include "atbox.commonEnv" . | nindent 12 }}
             - name: ATOM_SESSION_NAME
@@ -38,4 +59,17 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      {{- if or .Values.storage.uploads.existingClaim .Values.storage.downloads.existingClaim }}
+      volumes:
+        {{- if .Values.storage.uploads.existingClaim }}
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.uploads.existingClaim | quote }}
+        {{- end }}
+        {{- if .Values.storage.downloads.existingClaim }}
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.downloads.existingClaim | quote }}
+        {{- end }}
+      {{- end }}
 {{- end }}

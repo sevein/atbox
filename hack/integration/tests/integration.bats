@@ -17,30 +17,36 @@ bats::on_failure() {
   assert_role_marker "${ATBOX_REPLICA_SERVICE}" "readonly"
   assert_role_marker "${ATBOX_ADMIN_SERVICE}" "admin"
   assert_role_marker "${ATBOX_CLI_SERVICE}" "cli"
+  assert_role_marker "${ATBOX_WORKER_SERVICE}" "worker"
 }
 
 @test "public and admin endpoints answer HTTP requests" {
   wait_for_http_ok "${ATBOX_URL}" 240
   wait_for_http_ok "${ATBOX_REPLICA_URL}" 240
   wait_for_http_ok "${ATBOX_ADMIN_URL}" 240
+  wait_for_healthy "${ATBOX_WORKER_SERVICE}" 240
 }
 
 @test "generated runtime config matches each role" {
   assert_generated_runtime_config "${ATBOX_PRIMARY_SERVICE}" "true" "atbox-it" "true"
   assert_generated_runtime_config "${ATBOX_REPLICA_SERVICE}" "true" "atbox-it" "true"
   assert_generated_runtime_config "${ATBOX_ADMIN_SERVICE}" "false" "atbox-admin-it" "false"
+  assert_generated_runtime_config "${ATBOX_WORKER_SERVICE}" "false" "atbox-it" "true"
 }
 
-@test "web roles run hardened and rootless" {
+@test "runtime roles run hardened and rootless" {
   assert_runtime_hardening "${ATBOX_PRIMARY_SERVICE}"
   assert_runtime_hardening "${ATBOX_REPLICA_SERVICE}"
   assert_runtime_hardening "${ATBOX_ADMIN_SERVICE}"
+  assert_runtime_hardening "${ATBOX_WORKER_SERVICE}"
   assert_rootless_processes "${ATBOX_PRIMARY_SERVICE}"
   assert_rootless_processes "${ATBOX_REPLICA_SERVICE}"
   assert_rootless_processes "${ATBOX_ADMIN_SERVICE}"
+  assert_worker_process "${ATBOX_WORKER_SERVICE}"
   assert_no_tail_loggers "${ATBOX_PRIMARY_SERVICE}"
   assert_no_tail_loggers "${ATBOX_REPLICA_SERVICE}"
   assert_no_tail_loggers "${ATBOX_ADMIN_SERVICE}"
+  assert_no_tail_loggers "${ATBOX_WORKER_SERVICE}"
 }
 
 @test "readonly web roles block unsafe HTTP methods" {
@@ -49,6 +55,10 @@ bats::on_failure() {
 
 @test "cli role bootstraps and manages the search index" {
   bootstrap_search_index
+}
+
+@test "worker role executes Gearman jobs" {
+  assert_worker_job_execution
 }
 
 @test "readonly replicas share session state" {

@@ -1,0 +1,67 @@
+suite: worker deployment
+templates:
+  - templates/worker-deployment.yaml
+tests:
+  - it: renders no worker deployment by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the worker runtime with Gearman and shared storage
+    set:
+      atom.worker.enabled: true
+      atom.worker.replicaCount: 2
+      atom.worker.types: general,move
+      atom.worker.maxJobCount: "100"
+      atom.worker.annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      atom.worker.podAnnotations:
+        example.com/restarted-at: "test"
+      storage.uploads.existingClaim: atom-uploads
+      storage.downloads.existingClaim: atom-downloads
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-atbox-worker
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "30"
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.metadata.annotations["example.com/restarted-at"]
+          value: test
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: atbox-worker
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/sevein/atbox-worker:2.10.1
+      - equal:
+          path: spec.template.spec.containers[0].env[1]
+          value:
+            name: ATOM_GEARMAN_HOST
+            value: gearmand:4730
+      - equal:
+          path: spec.template.spec.containers[0].env[10]
+          value:
+            name: ATOM_WORKER_TYPES
+            value: general,move
+      - equal:
+          path: spec.template.spec.containers[0].env[13]
+          value:
+            name: ATOM_WORKER_MAX_JOB_COUNT
+            value: "100"
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0]
+          value:
+            name: uploads
+            mountPath: /atom/src/web/uploads
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: atom-uploads

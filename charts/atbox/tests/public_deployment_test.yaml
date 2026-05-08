@@ -21,12 +21,12 @@ tests:
           path: spec.template.spec.containers[0].image
           value: ghcr.io/sevein/atbox:2.10.1
       - equal:
-          path: spec.template.spec.containers[0].env[3]
+          path: spec.template.spec.containers[0].env[4]
           value:
             name: ATOM_CACHE_NAMESPACE
             value: atom
       - equal:
-          path: spec.template.spec.containers[0].env[7]
+          path: spec.template.spec.containers[0].env[9]
           value:
             name: ATOM_SESSION_NAME
             value: atom

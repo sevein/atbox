@@ -11,6 +11,10 @@ tests:
     set:
       bootstrap.searchPopulate.enabled: true
       bootstrap.searchPopulate.backoffLimit: 3
+      bootstrap.searchPopulate.annotations:
+        argocd.argoproj.io/sync-wave: "5"
+      bootstrap.searchPopulate.podAnnotations:
+        example.com/job: search
     asserts:
       - hasDocuments:
           count: 1
@@ -20,11 +24,17 @@ tests:
           path: metadata.name
           value: RELEASE-NAME-atbox-search-populate
       - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "5"
+      - equal:
           path: spec.backoffLimit
           value: 3
       - equal:
           path: spec.template.spec.restartPolicy
           value: Never
+      - equal:
+          path: spec.template.metadata.annotations["example.com/job"]
+          value: search
       - equal:
           path: spec.template.spec.containers[0].name
           value: search-populate

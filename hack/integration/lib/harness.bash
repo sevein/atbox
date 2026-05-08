@@ -10,6 +10,7 @@ ATBOX_PRIMARY_SERVICE="${ATBOX_PRIMARY_SERVICE:-atbox}"
 ATBOX_REPLICA_SERVICE="${ATBOX_REPLICA_SERVICE:-atbox_replica}"
 ATBOX_ADMIN_SERVICE="${ATBOX_ADMIN_SERVICE:-atbox_admin}"
 ATBOX_CLI_SERVICE="${ATBOX_CLI_SERVICE:-atbox_cli}"
+ATBOX_WORKER_SERVICE="${ATBOX_WORKER_SERVICE:-atbox_worker}"
 ATOM_NAMESPACE="${ATOM_NAMESPACE:-atbox-it}"
 ADMIN_ATOM_SESSION_NAME="${ADMIN_ATOM_SESSION_NAME:-atbox-admin-it}"
 ATBOX_REST_API_KEY="${ATBOX_REST_API_KEY:-atbox-rest-api-key}"
@@ -36,6 +37,7 @@ export ATBOX_PRIMARY_SERVICE
 export ATBOX_REPLICA_SERVICE
 export ATBOX_ADMIN_SERVICE
 export ATBOX_CLI_SERVICE
+export ATBOX_WORKER_SERVICE
 export ATOM_NAMESPACE
 export ADMIN_ATOM_SESSION_NAME
 export ATBOX_REST_API_KEY
@@ -66,7 +68,7 @@ cleanup() {
 collect_diagnostics() {
   echo
   echo "Integration run failed. Recent atbox logs:"
-  compose logs --no-color --tail=200 "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}" || true
+  compose logs --no-color --tail=200 "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}" "${ATBOX_WORKER_SERVICE}" || true
 }
 
 wait_for_healthy() {
@@ -185,6 +187,46 @@ check_non_root_comm "nginx" "nginx"
 '
 
   echo "Rootless process assertions passed for ${service} (nginx + php-fpm)"
+}
+
+assert_worker_process() {
+  local service="${1:?service name required}"
+
+  compose exec -T "${service}" php -r '
+if (!extension_loaded("gearman") || !class_exists("GearmanWorker")) {
+    fwrite(STDERR, "PHP Gearman extension is not loaded\n");
+    exit(1);
+}
+'
+
+  compose exec -T "${service}" sh -lc '
+set -eu
+found=0
+self="$$"
+
+for proc in /proc/[0-9]*; do
+  [ "$(basename "$proc")" = "$self" ] && continue
+  [ -r "$proc/cmdline" ] || continue
+  cmd="$(tr "\000" " " < "$proc/cmdline" 2>/dev/null || true)"
+  case "$cmd" in
+    *"symfony jobs:worker"*)
+      found=1
+      uid="$(awk "/^Uid:/{print \$2}" "$proc/status")"
+      if [ "$uid" = "0" ]; then
+        echo "jobs:worker is running as root (pid $(basename "$proc"))"
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+if [ "$found" != "1" ]; then
+  echo "No jobs:worker process found"
+  exit 1
+fi
+'
+
+  echo "Worker process assertion passed for ${service}"
 }
 
 assert_no_tail_loggers() {
@@ -495,6 +537,8 @@ expected_session_secure="$3"
 
 grep -q "read_only: ${expected_read_only}" /atom/src/apps/qubit/config/app.yml
 grep -q "prefix: atbox-it" /atom/src/apps/qubit/config/app.yml
+grep -q "default: gearmand:4730" /atom/src/config/gearman.yml
+grep -q "workers_key:" /atom/src/apps/qubit/config/app.yml
 grep -q "session_name: ${expected_session_name}" /atom/src/apps/qubit/config/factories.yml
 grep -q "session_cookie_secure: ${expected_session_secure}" /atom/src/apps/qubit/config/factories.yml
 grep -q "file_uploads = Off" /etc/php/8.3/mods-available/atbox.ini
@@ -502,6 +546,54 @@ grep -q "upload_max_filesize = 0" /etc/php/8.3/mods-available/atbox.ini
 SH
 
   echo "Generated runtime config assertions passed for ${service}"
+}
+
+assert_worker_job_execution() {
+  local job_id status deadline
+
+  job_id="$(
+    compose run --rm "${ATBOX_CLI_SERVICE}" php -r '
+require_once "/atom/src/config/ProjectConfiguration.class.php";
+$configuration = ProjectConfiguration::getApplicationConfiguration("qubit", "prod", false);
+new sfDatabaseManager($configuration);
+sfContext::createInstance($configuration);
+sfConfig::add(QubitSetting::getSettingsArray());
+$job = QubitJob::runJob("arTestJob", ["name" => "atbox worker smoke"]);
+echo $job->id, PHP_EOL;
+' | tail -n 1 | tr -d '\r'
+  )"
+
+  if [[ ! "${job_id}" =~ ^[0-9]+$ ]]; then
+    echo "Unable to enqueue worker smoke job (got: ${job_id})"
+    return 1
+  fi
+
+  deadline=$(( $(date +%s) + 60 ))
+  while true; do
+    status="$(
+      compose exec -T mysql sh -ec \
+        "mysql -N -B -uroot -p\"\$MYSQL_ROOT_PASSWORD\" atom -e \"SELECT status_id FROM job WHERE id = ${job_id};\"" \
+        | tr -d '\r'
+    )"
+
+    if [[ "${status}" == "184" ]]; then
+      echo "Worker job execution assertion passed (job ${job_id})"
+      return 0
+    fi
+
+    if [[ "${status}" == "185" ]]; then
+      echo "Worker smoke job failed (job ${job_id})"
+      return 1
+    fi
+
+    if (( $(date +%s) > deadline )); then
+      echo "Timed out waiting for worker smoke job ${job_id} (last status: ${status})"
+      compose logs --no-color --tail=100 "${ATBOX_WORKER_SERVICE}" || true
+      return 1
+    fi
+
+    sleep 2
+  done
 }
 
 assert_admin_blocks_dangerous_methods() {
@@ -641,12 +733,12 @@ integration_setup_suite() {
   enable_rest_api_plugin
 
   echo "Building role images"
-  compose build "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}" "${ATBOX_CLI_SERVICE}"
+  compose build "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}" "${ATBOX_CLI_SERVICE}" "${ATBOX_WORKER_SERVICE}"
   reset_demo_password
   set_demo_api_key
 
   echo "Starting atbox roles"
-  compose up -d "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}"
+  compose up -d "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_REPLICA_SERVICE}" "${ATBOX_ADMIN_SERVICE}" "${ATBOX_WORKER_SERVICE}"
   wait_for_healthy "${ATBOX_PRIMARY_SERVICE}" 240
   wait_for_healthy "${ATBOX_REPLICA_SERVICE}" 240
   wait_for_healthy "${ATBOX_ADMIN_SERVICE}" 240

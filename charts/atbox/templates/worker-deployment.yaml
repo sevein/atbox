@@ -1,0 +1,71 @@
+{{- if .Values.atom.worker.enabled }}
+{{- if or (not .Values.storage.uploads.existingClaim) (not .Values.storage.downloads.existingClaim) }}
+{{- fail "atom.worker.enabled requires storage.uploads.existingClaim and storage.downloads.existingClaim so admin and worker share AtoM-generated files" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atbox.fullname" . }}-worker
+  labels:
+    {{- include "atbox.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.atom.worker.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.atom.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "atbox.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "atbox.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      {{- with .Values.atom.worker.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: atbox-worker
+          image: "{{ .Values.atom.worker.image.repository }}:{{ default .Chart.AppVersion .Values.atom.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.atom.worker.image.pullPolicy }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /atom/src/web/uploads
+            - name: downloads
+              mountPath: /atom/src/web/downloads
+          env:
+            {{- include "atbox.commonEnv" . | nindent 12 }}
+            - name: ATOM_SESSION_NAME
+              value: {{ .Values.atom.namespace | quote }}
+            - name: ATOM_WORKER_TYPES
+              value: {{ .Values.atom.worker.types | quote }}
+            - name: ATOM_WORKER_ABILITIES
+              value: {{ .Values.atom.worker.abilities | quote }}
+            - name: ATOM_WORKER_MEMORY_LIMIT
+              value: {{ .Values.atom.worker.memoryLimit | quote }}
+            - name: ATOM_WORKER_MAX_JOB_COUNT
+              value: {{ .Values.atom.worker.maxJobCount | quote }}
+            - name: ATOM_WORKER_MAX_MEM_USAGE
+              value: {{ .Values.atom.worker.maxMemUsage | quote }}
+          {{- include "atbox.podSecurityContext" . | nindent 10 }}
+          {{- with .Values.atom.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.uploads.existingClaim | quote }}
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.downloads.existingClaim | quote }}
+{{- end }}

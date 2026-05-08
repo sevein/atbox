@@ -28,20 +28,51 @@ tests:
           path: spec.template.spec.containers[0].image
           value: ghcr.io/sevein/atbox-admin:2.10.1
       - equal:
-          path: spec.template.spec.containers[0].env[7]
+          path: spec.template.spec.containers[0].env[9]
           value:
             name: ATOM_SESSION_NAME
             value: atbox-admin-test
       - equal:
-          path: spec.template.spec.containers[0].env[8]
+          path: spec.template.spec.containers[0].env[10]
           value:
             name: ATOM_SESSION_COOKIE_SECURE
             value: "false"
       - equal:
-          path: spec.template.spec.containers[0].env[9]
+          path: spec.template.spec.containers[0].env[11]
           value:
             name: ATOM_SESSION_COOKIE_SAMESITE
             value: strict
       - equal:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
           value: NET_RAW
+
+  - it: fails when admin uploads are enabled without shared storage
+    set:
+      atom.admin.enabled: true
+      atom.admin.uploads.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: atom.admin.uploads.enabled requires storage.uploads.existingClaim and storage.downloads.existingClaim so admin, public, and worker share AtoM-generated files
+
+  - it: renders admin uploads with shared storage
+    set:
+      atom.admin.enabled: true
+      atom.admin.uploads.enabled: true
+      storage.uploads.existingClaim: atom-uploads
+      storage.downloads.existingClaim: atom-downloads
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].env[12]
+          value:
+            name: ATOM_UPLOADS_ENABLED
+            value: "true"
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0]
+          value:
+            name: uploads
+            mountPath: /atom/src/web/uploads
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: atom-uploads

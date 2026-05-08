@@ -93,6 +93,26 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
 
 FROM composer-deps AS atom-app
 
+FROM runtime-base AS job-runtime-base
+ARG PHP_VERSION
+ARG DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      default-jre-headless \
+      ffmpeg \
+      fop \
+      ghostscript \
+      imagemagick \
+      php${PHP_VERSION}-gearman \
+      poppler-utils; \
+    if [ -f /etc/ImageMagick-6/policy.xml ]; then \
+      sed -i 's#<policy domain="coder" rights="none" pattern="PDF" />#<policy domain="coder" rights="read|write" pattern="PDF" />#g' /etc/ImageMagick-6/policy.xml; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
+
 FROM runtime-base AS web-base
 ARG S6_OVERLAY_VERSION
 ARG PHP_VERSION
@@ -140,6 +160,23 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]
 
 FROM web-base AS admin-runtime
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      default-jre-headless \
+      ffmpeg \
+      fop \
+      ghostscript \
+      imagemagick \
+      poppler-utils; \
+    if [ -f /etc/ImageMagick-6/policy.xml ]; then \
+      sed -i 's#<policy domain="coder" rights="none" pattern="PDF" />#<policy domain="coder" rights="read|write" pattern="PDF" />#g' /etc/ImageMagick-6/policy.xml; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY nginx/admin.conf /etc/nginx/nginx.conf
 COPY rootfs/admin/ /
@@ -170,5 +207,29 @@ RUN set -eux; \
 
 ENTRYPOINT ["/usr/local/bin/atbox-cli-entrypoint"]
 CMD ["php", "symfony", "list"]
+
+FROM job-runtime-base AS worker-runtime
+ARG ATBOX_UID=10001
+ARG ATBOX_GID=10001
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN set -eux; \
+    groupadd --system --gid "${ATBOX_GID}" atbox; \
+    useradd --system --uid "${ATBOX_UID}" --gid atbox --create-home --home-dir /home/atbox --shell /usr/sbin/nologin atbox
+
+COPY --from=atom-app /atom/src /atom/src
+COPY rootfs/base/usr/local/bin/atbox-bootstrap.php /usr/local/bin/atbox-bootstrap.php
+COPY rootfs/worker/ /
+
+WORKDIR /atom/src
+
+RUN set -eux; \
+    mkdir -p /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log /atom/src/web/uploads/tmp /atom/src/web/downloads; \
+    chown -R atbox:atbox /tmp/atom /atom/src/cache /atom/src/log /atom/src/web/uploads /atom/src/web/downloads; \
+    chmod +x /usr/local/bin/atbox-bootstrap.php /usr/local/bin/atbox-worker-entrypoint
+
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/bin/atbox-worker-entrypoint"]
+CMD ["atbox-worker"]
 
 FROM readonly-runtime AS runtime

@@ -2,11 +2,11 @@
 
 ## Project overview
 
-- Builds AtoM container images for readonly web, admin web, and CLI roles.
+- Builds AtoM container images for readonly web, admin web, CLI, and worker roles.
 - Runtime roles are Dockerfile targets: `readonly-runtime`, `admin-runtime`,
-  `cli-runtime`.
+  `cli-runtime`, `worker-runtime`.
 - Root filesystem additions are split across `rootfs/base`, `rootfs/readonly`,
-  `rootfs/admin`, and `rootfs/cli`.
+  `rootfs/admin`, `rootfs/cli`, and `rootfs/worker`.
 - Helm chart lives in `charts/atbox`.
 - Integration stack lives in `hack/integration/`.
 
@@ -16,6 +16,7 @@
   - `docker buildx build --target readonly-runtime --check .`
   - `docker buildx build --target admin-runtime --check .`
   - `docker buildx build --target cli-runtime --check .`
+  - `docker buildx build --target worker-runtime --check .`
 - Full integration suite: `./hack/integration/run.sh`
 - Integration assertions live in `hack/integration/tests/*.bats`.
 - Keep failed integration stack up: `KEEP_UP=1 ./hack/integration/run.sh`
@@ -29,7 +30,7 @@
 
 ## Conventions
 
-- Keep readonly, admin, and CLI behavior isolated by image target.
+- Keep readonly, admin, CLI, and worker behavior isolated by image target.
 - Do not turn admin write behavior into a runtime switch on the public image.
 - Keep public readonly nginx limited to `GET` and `HEAD`.
 - Use explicit env vars for cache/session behavior.
@@ -47,5 +48,5 @@
 - `atom_version` is required when `release_images=true`.
 - `chart_version` is required when `release_chart=true`.
 - Published images: `ghcr.io/sevein/atbox`, `ghcr.io/sevein/atbox-admin`,
-  `ghcr.io/sevein/atbox-cli`.
+  `ghcr.io/sevein/atbox-cli`, `ghcr.io/sevein/atbox-worker`.
 - Helm chart is published as an OCI artifact from `charts/atbox`.

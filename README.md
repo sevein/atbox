@@ -1,27 +1,32 @@
 # atbox
 
-`atbox` packages [AtoM](https://github.com/artefactual/atom) into a
-production-oriented container focused on read-only access patterns.
-
-## What this image is for
-
-- Serve AtoM over `nginx` + `php-fpm` with `s6-overlay` supervision.
-- Keep runtime web services (`nginx`, `php-fpm`) on a non-root user.
-- Support read-only browsing workloads backed by external MySQL, Elasticsearch
-  and Memcached.
-
-The repository now builds a small role-based image family from the same AtoM
-source and dependency layers:
+`atbox` packages [AtoM](https://github.com/artefactual/atom) as a small,
+role-based container image family plus a Helm chart for attached deployments.
+The project is scoped around separating public read traffic from authenticated
+metadata-editing and lifecycle tasks while keeping all roles built from the same
+AtoM source and dependency layers.
 
 - `ghcr.io/sevein/atbox`: public read-only web runtime.
 - `ghcr.io/sevein/atbox-admin`: authenticated metadata-editing web runtime.
 - `ghcr.io/sevein/atbox-cli`: lifecycle/CLI runtime for one-shot jobs.
+- `ghcr.io/sevein/atbox-worker`: long-running AtoM Gearman worker runtime.
 
-> [!WARNING]
-> The current admin image supports the first metadata-editing milestone only:
-> login, legacy form `POST`, and simple record creation. Uploads, Gearman
-> workers, derivatives, exports, reports, finding aids, and other job-backed
-> legacy AtoM workflows are not supported by this image family yet.
+The chart in `charts/atbox` provides presets for read-only, admin-only, and
+public-plus-admin topologies where MySQL, Elasticsearch, Memcached, and
+Gearman are provided externally.
+
+## What this project is for
+
+- Serve AtoM over `nginx` + `php-fpm` with `s6-overlay` supervision for web
+  roles.
+- Keep runtime web services (`nginx`, `php-fpm`) on a non-root user.
+- Support public read-only browsing workloads backed by external MySQL,
+  Elasticsearch, and Memcached.
+- Isolate admin metadata-editing behavior in a separate image instead of a
+  runtime switch on the public image.
+- Provide a CLI image for lifecycle commands such as search indexing.
+- Provide a worker image for AtoM background jobs backed by external Gearman.
+- Ship Helm presets and validation coverage alongside the images.
 
 ## Design principles
 
@@ -55,9 +60,16 @@ read-mostly workloads.
 
 `atbox-admin` is a separate image target, not a runtime switch on the public
 image. It enables AtoM write behavior and accepts legacy form `POST` requests,
-but the first supported admin milestone is metadata editing only. Uploads,
-workers, Gearman, and job-backed derivative/export workflows remain outside this
-image for now.
+with uploads disabled by default. Enable uploads only when the admin tier has
+shared writable `uploads/` storage and an accompanying worker tier.
+
+### Worker behavior
+
+`atbox-worker` bootstraps the same AtoM config, connects to external Gearman,
+and runs `php -d memory_limit=-1 -d error_reporting=E_ALL symfony jobs:worker`
+as the non-root `atbox` user. The image includes the media and document tooling
+used by AtoM jobs, including ImageMagick, Ghostscript, Poppler, FFmpeg, Java,
+and Apache FOP.
 
 ### Cache architecture decisions
 
@@ -91,11 +103,13 @@ upstream support remains a future direction.
 
 - HTTP listen port: `8080`
 - Runtime user: `atbox` (UID/GID configurable)
-- External dependencies: MySQL + Elasticsearch + Memcached
-- Process supervision: `s6-overlay`
+- External dependencies: MySQL + Elasticsearch + Memcached + Gearman
+- Process supervision: `s6-overlay` for web roles
 
 `atbox-cli` does not run `s6-overlay`; it bootstraps the same AtoM config and
 then executes the supplied command, for example `php symfony search:populate`.
+`atbox-worker` also does not run `s6-overlay`; it bootstraps config, drops to the
+runtime user, and execs the worker command.
 
 ## Scope and non-goals
 
@@ -132,23 +146,40 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 | Variable                       | Required   | Default          | Notes                                                                                           |
 | ------------------------------ | ---------- | ---------------- | ----------------------------------------------------------------------------------------------- |
 | `ATOM_ELASTICSEARCH_HOST`      | Yes        | none             | Elasticsearch endpoint (`host[:port]`).                                                         |
+| `ATOM_GEARMAN_HOST`            | No         | `127.0.0.1:4730` | Gearman endpoint (`host[:port]`). Required for job-backed admin/worker use.                      |
 | `ATOM_MEMCACHED_HOST`          | Yes        | none             | Memcached endpoint (`host[:port]`).                                                             |
 | `ATOM_MYSQL_DSN`               | Yes        | none             | PDO DSN for MySQL.                                                                              |
 | `ATOM_MYSQL_USERNAME`          | Yes        | none             | MySQL username.                                                                                 |
 | `ATOM_MYSQL_PASSWORD`          | Yes        | none             | MySQL password.                                                                                 |
 | `ATOM_NAMESPACE`               | No         | `atom`           | Convenience default used by cache/session namespace settings when they are not set directly.    |
 | `ATOM_CACHE_NAMESPACE`         | No         | `ATOM_NAMESPACE` | Memcached key prefix. Set per tenant/deployment to avoid cache collisions.                      |
+| `ATOM_WORKERS_KEY`             | No         | empty            | AtoM worker key. Must match across admin, CLI, and worker roles sharing a Gearman server.        |
 | `ATOM_SESSION_NAME`            | No         | `ATOM_NAMESPACE` | Session cookie name. Use a distinct value when public/admin tiers should not share login state. |
 | `ATOM_SESSION_COOKIE_SECURE`   | Admin only | `true`           | Set `false` only for local plain-HTTP admin testing.                                            |
 | `ATOM_SESSION_COOKIE_SAMESITE` | Admin only | `lax`            | One of `strict`, `lax`, or `none`.                                                              |
+| `ATOM_UPLOADS_ENABLED`         | Admin only | `false`          | Enables PHP uploads and AtoM upload UI when shared writable storage is mounted.                  |
+| `ATOM_UPLOAD_LIMIT`            | Admin only | `-1`             | AtoM upload limit in gigabytes; `0` disables uploads, `-1` is unlimited.                         |
+| `ATOM_PHP_POST_MAX_SIZE`       | Admin only | `512M`           | PHP `post_max_size` when uploads are enabled.                                                    |
+| `ATOM_PHP_UPLOAD_MAX_FILESIZE` | Admin only | `512M`           | PHP `upload_max_filesize` when uploads are enabled.                                             |
+| `ATOM_PHP_MAX_FILE_UPLOADS`    | Admin only | `20`             | PHP `max_file_uploads` when uploads are enabled.                                                 |
+| `ATOM_WORKER_TYPES`            | Worker     | empty            | Optional comma-separated AtoM worker types from `gearman.yml`. Empty registers all configured types. |
+| `ATOM_WORKER_ABILITIES`        | Worker     | empty            | Optional comma-separated job class abilities. Overrides worker types when set.                  |
+| `ATOM_WORKER_MEMORY_LIMIT`     | Worker     | `-1`             | PHP memory limit passed to the worker process.                                                   |
+| `ATOM_WORKER_MAX_JOB_COUNT`    | Worker     | empty            | Optional worker shutdown threshold after N completed jobs.                                      |
+| `ATOM_WORKER_MAX_MEM_USAGE`    | Worker     | empty            | Optional worker shutdown threshold in kB RSS.                                                    |
 
 ## Helm chart
 
 This repository includes a chart in `charts/atbox` for attached deployments
-where MySQL, Elasticsearch, and Memcached are provided externally. Presets are
-included for read-only, admin-only, and public-plus-admin topologies:
+where MySQL, Elasticsearch, Memcached, and Gearman are provided externally.
+Presets are included for read-only, admin-only, and public-plus-admin
+topologies:
 
 ```bash
 helm template atbox charts/atbox \
   --values charts/atbox/values-public-plus-admin.yaml
 ```
+
+The chart exposes annotation maps on Deployments, Pods, Services, Jobs, and the
+database Secret for GitOps tools such as Argo CD. Worker deployments require
+existing PVCs for shared `uploads/` and `downloads/` storage.
