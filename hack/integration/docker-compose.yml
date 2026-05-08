@@ -16,13 +16,17 @@ x-atbox-common: &atbox-common
       condition: service_healthy
     elasticsearch:
       condition: service_healthy
+    gearmand:
+      condition: service_started
     memcached:
       condition: service_started
   environment:
     ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+    ATOM_GEARMAN_HOST: gearmand:4730
     ATOM_MEMCACHED_HOST: memcached:11211
     ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
     ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+    ATOM_WORKERS_KEY: ${ATOM_WORKERS_KEY:-}
     ATOM_SESSION_NAME: ${ATOM_SESSION_NAME:-atbox-it}
     ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
     ATOM_MYSQL_USERNAME: atom
@@ -71,15 +75,26 @@ services:
     image: memcached:1.6.39-bookworm
     command: ["-m", "128", "-p", "11211"]
 
+  gearmand:
+    image: artefactual/gearmand
+    ports:
+      - "14730:4730"
+
   atbox:
     <<: *atbox-common
     ports:
       - "18080:8080"
+    volumes:
+      - uploads-data:/atom/src/web/uploads:ro
+      - downloads-data:/atom/src/web/downloads:ro
 
   atbox_replica:
     <<: *atbox-common
     ports:
       - "18081:8080"
+    volumes:
+      - uploads-data:/atom/src/web/uploads:ro
+      - downloads-data:/atom/src/web/downloads:ro
 
   atbox_admin:
     <<: *atbox-common
@@ -90,9 +105,11 @@ services:
       target: admin-runtime
     environment:
       ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+      ATOM_GEARMAN_HOST: gearmand:4730
       ATOM_MEMCACHED_HOST: memcached:11211
       ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
       ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+      ATOM_WORKERS_KEY: ${ATOM_WORKERS_KEY:-}
       ATOM_SESSION_NAME: ${ADMIN_ATOM_SESSION_NAME:-atbox-admin-it}
       ATOM_SESSION_COOKIE_SECURE: "false"
       ATOM_SESSION_COOKIE_SAMESITE: lax
@@ -101,6 +118,9 @@ services:
       ATOM_MYSQL_PASSWORD: atom
     ports:
       - "18082:8080"
+    volumes:
+      - uploads-data:/atom/src/web/uploads
+      - downloads-data:/atom/src/web/downloads
 
   atbox_cli:
     image: atbox-cli:integration
@@ -114,17 +134,61 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      gearmand:
+        condition: service_started
       memcached:
         condition: service_started
     environment:
       ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+      ATOM_GEARMAN_HOST: gearmand:4730
       ATOM_MEMCACHED_HOST: memcached:11211
       ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
       ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+      ATOM_WORKERS_KEY: ${ATOM_WORKERS_KEY:-}
       ATOM_SESSION_NAME: ${ATOM_SESSION_NAME:-atbox-it}
       ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
       ATOM_MYSQL_USERNAME: atom
       ATOM_MYSQL_PASSWORD: atom
 
+  atbox_worker:
+    image: atbox-worker:integration
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: worker-runtime
+    cap_drop:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      gearmand:
+        condition: service_started
+      memcached:
+        condition: service_started
+    environment:
+      ATOM_ELASTICSEARCH_HOST: elasticsearch:9200
+      ATOM_GEARMAN_HOST: gearmand:4730
+      ATOM_MEMCACHED_HOST: memcached:11211
+      ATOM_NAMESPACE: ${ATOM_NAMESPACE:-atbox-it}
+      ATOM_CACHE_NAMESPACE: ${ATOM_CACHE_NAMESPACE:-atbox-it}
+      ATOM_WORKERS_KEY: ${ATOM_WORKERS_KEY:-}
+      ATOM_SESSION_NAME: ${ATOM_SESSION_NAME:-atbox-it}
+      ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
+      ATOM_MYSQL_USERNAME: atom
+      ATOM_MYSQL_PASSWORD: atom
+      ATOM_WORKER_ABILITIES: arTestJob
+    healthcheck:
+      disable: true
+    volumes:
+      - uploads-data:/atom/src/web/uploads
+      - downloads-data:/atom/src/web/downloads
+
 volumes:
   mysql-data:
+  uploads-data:
+  downloads-data:

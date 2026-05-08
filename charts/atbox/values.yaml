@@ -4,24 +4,38 @@ fullnameOverride: ""
 
 external:
   elasticsearchHost: elasticsearch:9200
+  gearmanHost: gearmand:4730
   memcachedHost: memcached:11211
   mysqlDsn: mysql:host=mysql;dbname=atom;charset=utf8mb4
   mysqlUsername: atom
   mysqlPassword: atom
 
+secret:
+  annotations: {}
+
+storage:
+  uploads:
+    existingClaim: ""
+  downloads:
+    existingClaim: ""
+
 atom:
   namespace: atom
   cacheNamespace: ""
+  workersKey: ""
 
   public:
     enabled: true
     replicaCount: 1
+    annotations: {}
+    podAnnotations: {}
     image:
       repository: ghcr.io/sevein/atbox
       tag: ""
       pullPolicy: IfNotPresent
     sessionName: ""
     service:
+      annotations: {}
       type: ClusterIP
       port: 80
     resources: {}
@@ -29,6 +43,8 @@ atom:
   admin:
     enabled: false
     replicaCount: 1
+    annotations: {}
+    podAnnotations: {}
     image:
       repository: ghcr.io/sevein/atbox-admin
       tag: ""
@@ -36,14 +52,39 @@ atom:
     sessionName: atom-admin
     sessionCookieSecure: true
     sessionCookieSameSite: lax
+    uploads:
+      enabled: false
+      limit: "-1"
+      postMaxSize: 512M
+      uploadMaxFilesize: 512M
+      maxFileUploads: "20"
     service:
+      annotations: {}
       type: ClusterIP
       port: 80
+    resources: {}
+
+  worker:
+    enabled: false
+    replicaCount: 1
+    annotations: {}
+    podAnnotations: {}
+    image:
+      repository: ghcr.io/sevein/atbox-worker
+      tag: ""
+      pullPolicy: IfNotPresent
+    types: ""
+    abilities: ""
+    memoryLimit: "-1"
+    maxJobCount: ""
+    maxMemUsage: ""
     resources: {}
 
 bootstrap:
   searchPopulate:
     enabled: false
+    annotations: {}
+    podAnnotations: {}
     image:
       repository: ghcr.io/sevein/atbox-cli
       tag: ""

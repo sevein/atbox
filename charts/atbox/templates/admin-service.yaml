@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "atbox.labels" . | nindent 4 }}
     app.kubernetes.io/component: admin
+  {{- with .Values.atom.admin.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.atom.admin.service.type }}
   ports:

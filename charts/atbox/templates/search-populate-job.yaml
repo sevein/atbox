@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "atbox.labels" . | nindent 4 }}
     app.kubernetes.io/component: lifecycle
+  {{- with .Values.bootstrap.searchPopulate.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   backoffLimit: {{ .Values.bootstrap.searchPopulate.backoffLimit }}
   template:
@@ -13,6 +17,10 @@ spec:
       labels:
         {{- include "atbox.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: lifecycle
+      {{- with .Values.bootstrap.searchPopulate.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       restartPolicy: {{ .Values.bootstrap.searchPopulate.restartPolicy }}
       {{- with .Values.imagePullSecrets }}

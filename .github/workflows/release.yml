@@ -100,6 +100,16 @@ jobs:
             target: cli-runtime
             platform: linux/arm64
             runner: ubuntu-24.04-arm
+          - role: worker
+            image: ghcr.io/sevein/atbox-worker
+            target: worker-runtime
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - role: worker
+            image: ghcr.io/sevein/atbox-worker
+            target: worker-runtime
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -166,6 +176,8 @@ jobs:
             image: ghcr.io/sevein/atbox-admin
           - role: cli
             image: ghcr.io/sevein/atbox-cli
+          - role: worker
+            image: ghcr.io/sevein/atbox-worker
     permissions:
       contents: read
       packages: write

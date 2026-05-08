@@ -5,7 +5,8 @@ dependencies from `package-lock.json`, then runs the Bats suite in
 `hack/integration/tests`.
 
 The Bats tests own the Docker Compose lifecycle and call the Playwright scripts
-for browser workflows.
+for browser workflows. The stack includes readonly, admin, CLI, and worker
+atbox roles plus external MySQL, Elasticsearch, Memcached, and Gearman.
 
 ## Commands
 
@@ -38,6 +39,7 @@ Defaults:
 - `ATBOX_ADMIN_URL=http://127.0.0.1:18082/`
 - `ATOM_NAMESPACE=atbox-it`
 - `ADMIN_ATOM_SESSION_NAME=atbox-admin-it`
+- `ATBOX_WORKER_SERVICE=atbox_worker`
 - `PROJECT_NAME=atbox-it`
 - `KEEP_UP=0`
 

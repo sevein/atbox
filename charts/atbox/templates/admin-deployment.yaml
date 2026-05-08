@@ -1,4 +1,7 @@
 {{- if .Values.atom.admin.enabled }}
+{{- if and .Values.atom.admin.uploads.enabled (or (not .Values.storage.uploads.existingClaim) (not .Values.storage.downloads.existingClaim)) }}
+{{- fail "atom.admin.uploads.enabled requires storage.uploads.existingClaim and storage.downloads.existingClaim so admin, public, and worker share AtoM-generated files" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,6 +9,10 @@ metadata:
   labels:
     {{- include "atbox.labels" . | nindent 4 }}
     app.kubernetes.io/component: admin
+  {{- with .Values.atom.admin.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.atom.admin.replicaCount }}
   selector:
@@ -17,6 +24,10 @@ spec:
       labels:
         {{- include "atbox.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: admin
+      {{- with .Values.atom.admin.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -29,6 +40,17 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          {{- if or .Values.storage.uploads.existingClaim .Values.storage.downloads.existingClaim }}
+          volumeMounts:
+            {{- if .Values.storage.uploads.existingClaim }}
+            - name: uploads
+              mountPath: /atom/src/web/uploads
+            {{- end }}
+            {{- if .Values.storage.downloads.existingClaim }}
+            - name: downloads
+              mountPath: /atom/src/web/downloads
+            {{- end }}
+          {{- end }}
           env:
             {{- include "atbox.commonEnv" . | nindent 12 }}
             - name: ATOM_SESSION_NAME
@@ -37,9 +59,32 @@ spec:
               value: {{ .Values.atom.admin.sessionCookieSecure | quote }}
             - name: ATOM_SESSION_COOKIE_SAMESITE
               value: {{ .Values.atom.admin.sessionCookieSameSite | quote }}
+            - name: ATOM_UPLOADS_ENABLED
+              value: {{ .Values.atom.admin.uploads.enabled | quote }}
+            - name: ATOM_UPLOAD_LIMIT
+              value: {{ .Values.atom.admin.uploads.limit | quote }}
+            - name: ATOM_PHP_POST_MAX_SIZE
+              value: {{ .Values.atom.admin.uploads.postMaxSize | quote }}
+            - name: ATOM_PHP_UPLOAD_MAX_FILESIZE
+              value: {{ .Values.atom.admin.uploads.uploadMaxFilesize | quote }}
+            - name: ATOM_PHP_MAX_FILE_UPLOADS
+              value: {{ .Values.atom.admin.uploads.maxFileUploads | quote }}
           {{- include "atbox.podSecurityContext" . | nindent 10 }}
           {{- with .Values.atom.admin.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      {{- if or .Values.storage.uploads.existingClaim .Values.storage.downloads.existingClaim }}
+      volumes:
+        {{- if .Values.storage.uploads.existingClaim }}
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.uploads.existingClaim | quote }}
+        {{- end }}
+        {{- if .Values.storage.downloads.existingClaim }}
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.downloads.existingClaim | quote }}
+        {{- end }}
+      {{- end }}
 {{- end }}

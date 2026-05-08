@@ -30,6 +30,13 @@ function envOrDefault(string $name, string $default): string
     return $value;
 }
 
+function nonEmptyEnvOrDefault(string $name, string $default): string
+{
+    $value = trim(envOrDefault($name, $default));
+
+    return '' === $value ? $default : $value;
+}
+
 function boolEnvOrDefault(string $name, bool $default): bool
 {
     $value = getenv($name);
@@ -84,7 +91,7 @@ function roleOrFail(): string
     }
 
     $role = trim((string) file_get_contents(ROLE_FILE));
-    if (!in_array($role, ['readonly', 'admin', 'cli'], true)) {
+    if (!in_array($role, ['readonly', 'admin', 'cli', 'worker'], true)) {
         fwrite(STDERR, "Unsupported atbox role: {$role}\n");
         exit(1);
     }
@@ -97,22 +104,40 @@ function yamlBool(bool $value): string
     return $value ? 'true' : 'false';
 }
 
+function validateSimpleName(string $name, string $value): void
+{
+    if (!preg_match('/^[A-Za-z0-9_-]*$/', $value)) {
+        fwrite(STDERR, "{$name} may contain only letters, numbers, '_' or '-'\n");
+        exit(1);
+    }
+}
+
 $role = roleOrFail();
 $legacyNamespace = envOrDefault('ATOM_NAMESPACE', 'atom');
 $config = [
     'atom.elasticsearch_host' => envOrFail('ATOM_ELASTICSEARCH_HOST'),
     'atom.memcached_host' => envOrFail('ATOM_MEMCACHED_HOST'),
+    'atom.gearman_host' => nonEmptyEnvOrDefault('ATOM_GEARMAN_HOST', '127.0.0.1:4730'),
     'atom.cache_namespace' => envOrDefault('ATOM_CACHE_NAMESPACE', $legacyNamespace),
     'atom.session_name' => envOrDefault('ATOM_SESSION_NAME', $legacyNamespace),
+    'atom.workers_key' => envOrDefault('ATOM_WORKERS_KEY', ''),
     'atom.mysql_dsn' => envOrFail('ATOM_MYSQL_DSN'),
     'atom.mysql_username' => envOrFail('ATOM_MYSQL_USERNAME'),
     'atom.mysql_password' => envOrFail('ATOM_MYSQL_PASSWORD'),
 ];
 $readOnly = 'readonly' === $role;
+$uploadsEnabled = 'admin' === $role && boolEnvOrDefault('ATOM_UPLOADS_ENABLED', false);
+$uploadLimit = $readOnly || !$uploadsEnabled && 'admin' === $role
+    ? '0'
+    : envOrDefault('ATOM_UPLOAD_LIMIT', '-1');
 $sessionCookieSecure = 'admin' === $role
     ? boolEnvOrDefault('ATOM_SESSION_COOKIE_SECURE', true)
     : true;
 $sessionCookieSameSite = strtolower(envOrDefault('ATOM_SESSION_COOKIE_SAMESITE', 'lax'));
+$phpPostMaxSize = $uploadsEnabled ? envOrDefault('ATOM_PHP_POST_MAX_SIZE', '512M') : '8M';
+$phpFileUploads = $uploadsEnabled ? 'On' : 'Off';
+$phpUploadMaxFilesize = $uploadsEnabled ? envOrDefault('ATOM_PHP_UPLOAD_MAX_FILESIZE', '512M') : '0';
+$phpMaxFileUploads = $uploadsEnabled ? envOrDefault('ATOM_PHP_MAX_FILE_UPLOADS', '20') : '0';
 
 if (!is_dir(ATOM_DIR)) {
     fwrite(STDERR, 'AtoM source tree not found at '.ATOM_DIR."\n");
@@ -124,11 +149,20 @@ if (!class_exists('Memcache')) {
     exit(1);
 }
 
-foreach (['ATOM_CACHE_NAMESPACE' => $config['atom.cache_namespace'], 'ATOM_SESSION_NAME' => $config['atom.session_name']] as $name => $value) {
+foreach ([
+    'ATOM_CACHE_NAMESPACE' => $config['atom.cache_namespace'],
+    'ATOM_SESSION_NAME' => $config['atom.session_name'],
+] as $name => $value) {
     if (!preg_match('/^[A-Za-z0-9_-]+$/', $value)) {
         fwrite(STDERR, "{$name} may contain only letters, numbers, '_' or '-'\n");
         exit(1);
     }
+}
+validateSimpleName('ATOM_WORKERS_KEY', $config['atom.workers_key']);
+
+if (!preg_match('/^-?[0-9]+(?:\.[0-9]+)?$/', $uploadLimit)) {
+    fwrite(STDERR, "ATOM_UPLOAD_LIMIT must be a number of gigabytes\n");
+    exit(1);
 }
 
 if (!in_array($sessionCookieSameSite, ['strict', 'lax', 'none'], true)) {
@@ -150,22 +184,29 @@ if (file_exists(ATOM_DIR.'/config/propel.ini.tmpl')) {
 
 $elasticsearch = hostPort($config['atom.elasticsearch_host'], 9200);
 $memcached = hostPort($config['atom.memcached_host'], 11211);
+$gearman = hostPort($config['atom.gearman_host'], 4730);
 $readOnlyYaml = yamlBool($readOnly);
 $fpmReadOnly = $readOnly ? 'on' : 'off';
 $sessionCookieSecureYaml = yamlBool($sessionCookieSecure);
+$workersKey = $config['atom.workers_key'];
+$gearmanYaml = <<<YAML
+all:
+  servers:
+    default: {$gearman['host']}:{$gearman['port']}
 
-// Keep this file present because some AtoM code paths expect it, even in read-only deployments.
-writeFile(
-    ATOM_DIR.'/apps/qubit/config/gearman.yml',
-    "all:\n  servers:\n    default: 127.0.0.1:4730\n"
-);
+YAML;
+
+// Keep Gearman config present because AtoM job code loads it even before enqueuing work.
+writeFile(ATOM_DIR.'/config/gearman.yml', $gearmanYaml);
+writeFile(ATOM_DIR.'/apps/qubit/config/gearman.yml', $gearmanYaml);
 
 writeFile(
     ATOM_DIR.'/apps/qubit/config/app.yml',
     <<<YAML
 all:
-  upload_limit: -1
+  upload_limit: {$uploadLimit}
   download_timeout: 10
+  workers_key: {$workersKey}
   cache_engine: sfMemcacheCache
   cache_engine_param:
     host: {$memcached['host']}
@@ -325,7 +366,7 @@ PHP
 
 writeFile(
     '/etc/php/'.PHP_SERIES.'/mods-available/atbox.ini',
-    <<<'INI'
+    <<<INI
 [PHP]
 output_buffering = 4096
 expose_php = off
@@ -336,12 +377,12 @@ display_startup_errors = on
 max_execution_time = 120
 max_input_time = 60
 memory_limit = 512M
-post_max_size = 8M
+post_max_size = {$phpPostMaxSize}
 default_charset = UTF-8
 cgi.fix_pathinfo = off
-file_uploads = Off
-upload_max_filesize = 0
-max_file_uploads = 0
+file_uploads = {$phpFileUploads}
+upload_max_filesize = {$phpUploadMaxFilesize}
+max_file_uploads = {$phpMaxFileUploads}
 date.timezone = UTC
 session.use_only_cookies = on
 opcache.fast_shutdown = on
@@ -374,5 +415,18 @@ FPM
 );
 
 @symlink(ATOM_DIR.'/vendor/symfony/data/web/sf', ATOM_DIR.'/sf');
+
+foreach ([
+    ATOM_DIR.'/web/uploads',
+    ATOM_DIR.'/web/uploads/tmp',
+    ATOM_DIR.'/web/downloads',
+] as $runtimeDir) {
+    if (!is_dir($runtimeDir)) {
+        @mkdir($runtimeDir, 0775, true);
+    }
+
+    @chown($runtimeDir, 'atbox');
+    @chgrp($runtimeDir, 'atbox');
+}
 
 fwrite(STDOUT, "atbox php bootstrap complete ({$role})\n");

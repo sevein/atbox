@@ -8,10 +8,12 @@ This repository builds and tests a small AtoM container image family:
   `ghcr.io/sevein/atbox-admin`.
 - `cli-runtime`: one-shot lifecycle/runtime CLI image, published as
   `ghcr.io/sevein/atbox-cli`.
+- `worker-runtime`: long-running AtoM Gearman worker image, published as
+  `ghcr.io/sevein/atbox-worker`.
 
 Keep changes scoped to those roles. The readonly image should remain safe for
-public browsing, while admin and CLI behavior should stay isolated in their own
-targets.
+public browsing, while admin, CLI, and worker behavior should stay isolated in
+their own targets.
 
 ## Requirements
 
@@ -33,6 +35,7 @@ files under `hack/integration/output/`.
 - `rootfs/readonly/`: readonly-only filesystem additions.
 - `rootfs/admin/`: admin-only filesystem additions.
 - `rootfs/cli/`: CLI-only filesystem additions.
+- `rootfs/worker/`: worker-only filesystem additions.
 - `nginx/`: readonly and admin nginx configs.
 - `hack/integration/`: Docker Compose integration suite.
 - `charts/atbox/`: Helm chart and preset values files.
@@ -52,6 +55,7 @@ Build all role images explicitly:
 docker buildx build --target readonly-runtime -t atbox:dev --load .
 docker buildx build --target admin-runtime -t atbox-admin:dev --load .
 docker buildx build --target cli-runtime -t atbox-cli:dev --load .
+docker buildx build --target worker-runtime -t atbox-worker:dev --load .
 ```
 
 Build for a specific platform when checking multi-architecture behavior:
@@ -67,6 +71,7 @@ Use `--check` before heavier builds when changing the Dockerfile:
 docker buildx build --target readonly-runtime --check .
 docker buildx build --target admin-runtime --check .
 docker buildx build --target cli-runtime --check .
+docker buildx build --target worker-runtime --check .
 ```
 
 ## Local runtime checks
@@ -188,9 +193,8 @@ docs when behavior changes. Keep `AGENTS.md` short and command-oriented.
   startup-time package installs or source edits.
 - Keep public readonly containers limited to `GET` and `HEAD` unless the project
   intentionally expands that support.
-- Keep admin milestones narrow. Metadata editing is supported; uploads, Gearman
-  workers, derivative generation, and export/report workflows need separate
-  design.
+- Keep admin and worker write behavior paired with explicit Gearman and shared
+  upload/download storage configuration.
 - Keep cache and session names explicit when public/admin tiers share Memcached.
 - Validate Helm changes with `helm unittest`, `helm lint`, `helm template`, and
   `./hack/helm-kubeconform.sh`.
@@ -242,6 +246,7 @@ manifests for:
 - `ghcr.io/sevein/atbox:<image_tag>`
 - `ghcr.io/sevein/atbox-admin:<image_tag>`
 - `ghcr.io/sevein/atbox-cli:<image_tag>`
+- `ghcr.io/sevein/atbox-worker:<image_tag>`
 
 When `release_chart=true`, it packages `charts/atbox` with the supplied chart
 version and publishes it to GHCR as an OCI Helm artifact. The chart `appVersion`

@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "atbox.labels" . | nindent 4 }}
     app.kubernetes.io/component: public
+  {{- with .Values.atom.public.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.atom.public.service.type }}
   ports:

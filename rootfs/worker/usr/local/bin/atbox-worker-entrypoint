@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+set -eu
+
+php /usr/local/bin/atbox-bootstrap.php
+
+if [ "$#" -eq 0 ] || [ "$1" = "atbox-worker" ]; then
+  shift || true
+
+  set -- php \
+    -d "memory_limit=${ATOM_WORKER_MEMORY_LIMIT:--1}" \
+    -d "error_reporting=E_ALL" \
+    symfony jobs:worker
+
+  if [ -n "${ATOM_WORKER_TYPES:-}" ]; then
+    set -- "$@" "--types=${ATOM_WORKER_TYPES}"
+  fi
+
+  if [ -n "${ATOM_WORKER_ABILITIES:-}" ]; then
+    set -- "$@" "--abilities=${ATOM_WORKER_ABILITIES}"
+  fi
+
+  if [ -n "${ATOM_WORKER_MAX_JOB_COUNT:-}" ]; then
+    set -- "$@" "--max-job-count=${ATOM_WORKER_MAX_JOB_COUNT}"
+  fi
+
+  if [ -n "${ATOM_WORKER_MAX_MEM_USAGE:-}" ]; then
+    set -- "$@" "--max-mem-usage=${ATOM_WORKER_MAX_MEM_USAGE}"
+  fi
+fi
+
+if [ "$(id -u)" = "0" ]; then
+  exec setpriv --reuid=atbox --regid=atbox --init-groups "$@"
+fi
+
+exec "$@"

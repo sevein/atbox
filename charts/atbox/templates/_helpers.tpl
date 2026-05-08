@@ -31,12 +31,16 @@ app.kubernetes.io/instance: {{ .Release.Name | quote }}
 {{- define "atbox.commonEnv" -}}
 - name: ATOM_ELASTICSEARCH_HOST
   value: {{ .Values.external.elasticsearchHost | quote }}
+- name: ATOM_GEARMAN_HOST
+  value: {{ .Values.external.gearmanHost | quote }}
 - name: ATOM_MEMCACHED_HOST
   value: {{ .Values.external.memcachedHost | quote }}
 - name: ATOM_NAMESPACE
   value: {{ .Values.atom.namespace | quote }}
 - name: ATOM_CACHE_NAMESPACE
   value: {{ default .Values.atom.namespace .Values.atom.cacheNamespace | quote }}
+- name: ATOM_WORKERS_KEY
+  value: {{ .Values.atom.workersKey | quote }}
 - name: ATOM_MYSQL_DSN
   valueFrom:
     secretKeyRef:
