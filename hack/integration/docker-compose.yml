@@ -181,7 +181,6 @@ services:
       ATOM_MYSQL_DSN: mysql:host=mysql;dbname=atom;charset=utf8mb4
       ATOM_MYSQL_USERNAME: atom
       ATOM_MYSQL_PASSWORD: atom
-      ATOM_WORKER_ABILITIES: arTestJob
     healthcheck:
       disable: true
     volumes:

@@ -104,6 +104,45 @@ function yamlBool(bool $value): string
     return $value ? 'true' : 'false';
 }
 
+function gearmanWorkerTypesYaml(string $path): string
+{
+    if (!is_readable($path)) {
+        return '';
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES);
+    if (false === $lines) {
+        return '';
+    }
+
+    $block = [];
+    $capturing = false;
+
+    foreach ($lines as $line) {
+        if (!$capturing) {
+            if (preg_match('/^  worker_types:\s*(?:#.*)?$/', $line)) {
+                $capturing = true;
+                $block[] = $line;
+            }
+
+            continue;
+        }
+
+        if (preg_match('/^\S/', $line) || preg_match('/^  [A-Za-z0-9_-]+:\s*/', $line)) {
+            break;
+        }
+
+        if ('' === $line || preg_match('/^( {4,}|  #)/', $line)) {
+            $block[] = $line;
+            continue;
+        }
+
+        break;
+    }
+
+    return implode("\n", $block);
+}
+
 function validateSimpleName(string $name, string $value): void
 {
     if (!preg_match('/^[A-Za-z0-9_-]*$/', $value)) {
@@ -189,14 +228,20 @@ $readOnlyYaml = yamlBool($readOnly);
 $fpmReadOnly = $readOnly ? 'on' : 'off';
 $sessionCookieSecureYaml = yamlBool($sessionCookieSecure);
 $workersKey = $config['atom.workers_key'];
+$gearmanWorkerTypesYaml = gearmanWorkerTypesYaml(ATOM_DIR.'/config/gearman.yml')
+    ?: gearmanWorkerTypesYaml(ATOM_DIR.'/apps/qubit/config/gearman.yml');
 $gearmanYaml = <<<YAML
 all:
   servers:
     default: {$gearman['host']}:{$gearman['port']}
 
 YAML;
+if ('' !== $gearmanWorkerTypesYaml) {
+    $gearmanYaml .= $gearmanWorkerTypesYaml."\n";
+}
 
 // Keep Gearman config present because AtoM job code loads it even before enqueuing work.
+// Preserve worker_types so the worker can register AtoM's default abilities.
 writeFile(ATOM_DIR.'/config/gearman.yml', $gearmanYaml);
 writeFile(ATOM_DIR.'/apps/qubit/config/gearman.yml', $gearmanYaml);
 

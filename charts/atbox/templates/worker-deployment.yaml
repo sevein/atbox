@@ -46,10 +46,6 @@ spec:
             {{- include "atbox.commonEnv" . | nindent 12 }}
             - name: ATOM_SESSION_NAME
               value: {{ .Values.atom.namespace | quote }}
-            - name: ATOM_WORKER_TYPES
-              value: {{ .Values.atom.worker.types | quote }}
-            - name: ATOM_WORKER_ABILITIES
-              value: {{ .Values.atom.worker.abilities | quote }}
             - name: ATOM_WORKER_MEMORY_LIMIT
               value: {{ .Values.atom.worker.memoryLimit | quote }}
             - name: ATOM_WORKER_MAX_JOB_COUNT

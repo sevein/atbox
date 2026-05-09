@@ -70,6 +70,7 @@ and runs `php -d memory_limit=-1 -d error_reporting=E_ALL symfony jobs:worker`
 as the non-root `atbox` user. The image includes the media and document tooling
 used by AtoM jobs through the Nix-defined worker toolchain, including
 ImageMagick, Ghostscript, Poppler, FFmpeg, Java, Apache FOP, and Unzip.
+Worker abilities are the upstream AtoM defaults from generated `gearman.yml`.
 
 ### AtoM toolchain
 
@@ -213,8 +214,6 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 | `ATOM_PHP_POST_MAX_SIZE`       | Admin only | `512M`           | PHP `post_max_size` when uploads are enabled.                                                    |
 | `ATOM_PHP_UPLOAD_MAX_FILESIZE` | Admin only | `512M`           | PHP `upload_max_filesize` when uploads are enabled.                                             |
 | `ATOM_PHP_MAX_FILE_UPLOADS`    | Admin only | `20`             | PHP `max_file_uploads` when uploads are enabled.                                                 |
-| `ATOM_WORKER_TYPES`            | Worker     | empty            | Optional comma-separated AtoM worker types from `gearman.yml`. Empty registers all configured types. |
-| `ATOM_WORKER_ABILITIES`        | Worker     | empty            | Optional comma-separated job class abilities. Overrides worker types when set.                  |
 | `ATOM_WORKER_MEMORY_LIMIT`     | Worker     | `-1`             | PHP memory limit passed to the worker process.                                                   |
 | `ATOM_WORKER_MAX_JOB_COUNT`    | Worker     | empty            | Optional worker shutdown threshold after N completed jobs.                                      |
 | `ATOM_WORKER_MAX_MEM_USAGE`    | Worker     | empty            | Optional worker shutdown threshold in kB RSS.                                                    |

@@ -73,8 +73,6 @@ atom:
       repository: ghcr.io/sevein/atbox-worker
       tag: ""
       pullPolicy: IfNotPresent
-    types: ""
-    abilities: ""
     memoryLimit: "-1"
     maxJobCount: ""
     maxMemUsage: ""

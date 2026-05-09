@@ -391,8 +391,6 @@
         "annotations",
         "podAnnotations",
         "image",
-        "types",
-        "abilities",
         "memoryLimit",
         "maxJobCount",
         "maxMemUsage",
@@ -414,12 +412,6 @@
         },
         "image": {
           "$ref": "#/definitions/image"
-        },
-        "types": {
-          "type": "string"
-        },
-        "abilities": {
-          "type": "string"
         },
         "memoryLimit": {
           "type": "string",

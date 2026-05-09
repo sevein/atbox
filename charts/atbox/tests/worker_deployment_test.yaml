@@ -11,7 +11,6 @@ tests:
     set:
       atom.worker.enabled: true
       atom.worker.replicaCount: 2
-      atom.worker.types: general,move
       atom.worker.maxJobCount: "100"
       atom.worker.annotations:
         argocd.argoproj.io/sync-wave: "30"
@@ -48,12 +47,7 @@ tests:
             name: ATOM_GEARMAN_HOST
             value: gearmand:4730
       - equal:
-          path: spec.template.spec.containers[0].env[10]
-          value:
-            name: ATOM_WORKER_TYPES
-            value: general,move
-      - equal:
-          path: spec.template.spec.containers[0].env[13]
+          path: spec.template.spec.containers[0].env[11]
           value:
             name: ATOM_WORKER_MAX_JOB_COUNT
             value: "100"

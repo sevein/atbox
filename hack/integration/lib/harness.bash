@@ -591,6 +591,10 @@ expected_session_secure="$3"
 grep -q "read_only: ${expected_read_only}" /atom/src/apps/qubit/config/app.yml
 grep -q "prefix: atbox-it" /atom/src/apps/qubit/config/app.yml
 grep -q "default: gearmand:4730" /atom/src/config/gearman.yml
+grep -q "worker_types:" /atom/src/config/gearman.yml
+grep -q "arFindingAidJob" /atom/src/config/gearman.yml
+grep -q "worker_types:" /atom/src/apps/qubit/config/gearman.yml
+grep -q "arFindingAidJob" /atom/src/apps/qubit/config/gearman.yml
 grep -q "workers_key:" /atom/src/apps/qubit/config/app.yml
 grep -q "session_name: ${expected_session_name}" /atom/src/apps/qubit/config/factories.yml
 grep -q "session_cookie_secure: ${expected_session_secure}" /atom/src/apps/qubit/config/factories.yml
@@ -601,46 +605,46 @@ SH
   echo "Generated runtime config assertions passed for ${service}"
 }
 
-assert_worker_job_execution() {
-  local job_id status deadline
+assert_worker_default_abilities() {
+  local ability_count deadline
 
-  job_id="$(
-    compose run --rm "${ATBOX_CLI_SERVICE}" php -r '
+  deadline=$(( $(date +%s) + 60 ))
+  while true; do
+    ability_count="$(
+      compose run --rm "${ATBOX_CLI_SERVICE}" php -r '
 require_once "/atom/src/config/ProjectConfiguration.class.php";
 $configuration = ProjectConfiguration::getApplicationConfiguration("qubit", "prod", false);
 new sfDatabaseManager($configuration);
 sfContext::createInstance($configuration);
 sfConfig::add(QubitSetting::getSettingsArray());
-$job = QubitJob::runJob("arTestJob", ["name" => "atbox worker smoke"]);
-echo $job->id, PHP_EOL;
+$manager = new Net_Gearman_Manager(arGearman::getServer(), 2);
+$status = $manager->status();
+$prefix = QubitJob::getJobPrefix();
+$abilities = [
+    "arFindingAidJob",
+    "arInheritRightsJob",
+    "arInformationObjectCsvExportJob",
+    "arFileImportJob",
+    "arAccessionCsvExportJob",
+];
+$registered = 0;
+foreach ($abilities as $ability) {
+    $name = $prefix.$ability;
+    if (isset($status[$name]) && $status[$name]["capable_workers"] > 0) {
+        ++$registered;
+    }
+}
+echo $registered, PHP_EOL;
 ' | tail -n 1 | tr -d '\r'
-  )"
-
-  if [[ ! "${job_id}" =~ ^[0-9]+$ ]]; then
-    echo "Unable to enqueue worker smoke job (got: ${job_id})"
-    return 1
-  fi
-
-  deadline=$(( $(date +%s) + 60 ))
-  while true; do
-    status="$(
-      compose exec -T mysql sh -ec \
-        "mysql -N -B -uroot -p\"\$MYSQL_ROOT_PASSWORD\" atom -e \"SELECT status_id FROM job WHERE id = ${job_id};\"" \
-        | tr -d '\r'
     )"
 
-    if [[ "${status}" == "184" ]]; then
-      echo "Worker job execution assertion passed (job ${job_id})"
+    if [[ "${ability_count}" == "5" ]]; then
+      echo "Worker default ability registration assertion passed"
       return 0
     fi
 
-    if [[ "${status}" == "185" ]]; then
-      echo "Worker smoke job failed (job ${job_id})"
-      return 1
-    fi
-
     if (( $(date +%s) > deadline )); then
-      echo "Timed out waiting for worker smoke job ${job_id} (last status: ${status})"
+      echo "Expected worker to register default AtoM abilities, got ${ability_count}/5"
       compose logs --no-color --tail=100 "${ATBOX_WORKER_SERVICE}" || true
       return 1
     fi

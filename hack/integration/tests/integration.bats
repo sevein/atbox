@@ -68,8 +68,8 @@ bats::on_failure() {
   bootstrap_search_index
 }
 
-@test "worker role executes Gearman jobs" {
-  assert_worker_job_execution
+@test "worker role registers default Gearman abilities" {
+  assert_worker_default_abilities
 }
 
 @test "readonly replicas share session state" {
