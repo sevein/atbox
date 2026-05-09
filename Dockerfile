@@ -43,6 +43,7 @@ RUN set -eux; \
 FROM debian:bookworm-slim AS runtime-base
 ARG PHP_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
+ENV PATH=/usr/local/bin:${PATH}
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     set -eux; \
@@ -55,7 +56,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends \
       iproute2 \
       nginx \
-      unzip \
       xz-utils \
       php${PHP_VERSION}-fpm \
       php${PHP_VERSION}-cli \
@@ -81,6 +81,12 @@ ARG ATBOX_UID=10001
 ARG ATBOX_GID=10001
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_CACHE_DIR=/tmp/composer-cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends unzip; \
+    rm -rf /var/lib/apt/lists/*
 RUN set -eux; \
     groupadd --system --gid "${ATBOX_GID}" atbox; \
     useradd --system --uid "${ATBOX_UID}" --gid atbox --create-home --home-dir /home/atbox --shell /usr/sbin/nologin atbox
@@ -93,6 +99,40 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
 
 FROM composer-deps AS atom-app
 
+FROM nixos/nix:2.29.0 AS nix-toolchain-base
+
+WORKDIR /src
+
+COPY flake.nix flake.lock /src/
+COPY nix/ /src/nix/
+
+FROM nix-toolchain-base AS admin-toolchain
+
+RUN nix --extra-experimental-features "nix-command flakes" \
+      build --print-build-logs --out-link /tmp/result .#atbox-admin-toolchain
+RUN set -eux; \
+    mkdir -p /tmp/closure/nix/store /tmp/closure/usr/local/bin; \
+    cp -a --parents $(nix-store --query --requisites /tmp/result) /tmp/closure; \
+    cp -a /tmp/result/bin/. /tmp/closure/usr/local/bin/
+
+FROM nix-toolchain-base AS cli-toolchain
+
+RUN nix --extra-experimental-features "nix-command flakes" \
+      build --print-build-logs --out-link /tmp/result .#atbox-cli-toolchain
+RUN set -eux; \
+    mkdir -p /tmp/closure/nix/store /tmp/closure/usr/local/bin; \
+    cp -a --parents $(nix-store --query --requisites /tmp/result) /tmp/closure; \
+    cp -a /tmp/result/bin/. /tmp/closure/usr/local/bin/
+
+FROM nix-toolchain-base AS worker-toolchain
+
+RUN nix --extra-experimental-features "nix-command flakes" \
+      build --print-build-logs --out-link /tmp/result .#atbox-worker-toolchain
+RUN set -eux; \
+    mkdir -p /tmp/closure/nix/store /tmp/closure/usr/local/bin; \
+    cp -a --parents $(nix-store --query --requisites /tmp/result) /tmp/closure; \
+    cp -a /tmp/result/bin/. /tmp/closure/usr/local/bin/
+
 FROM runtime-base AS job-runtime-base
 ARG PHP_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
@@ -101,16 +141,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      default-jre-headless \
-      ffmpeg \
-      fop \
-      ghostscript \
-      imagemagick \
-      php${PHP_VERSION}-gearman \
-      poppler-utils; \
-    if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-      sed -i 's#<policy domain="coder" rights="none" pattern="PDF" />#<policy domain="coder" rights="read|write" pattern="PDF" />#g' /etc/ImageMagick-6/policy.xml; \
-    fi; \
+      php${PHP_VERSION}-gearman; \
     rm -rf /var/lib/apt/lists/*
 
 FROM runtime-base AS web-base
@@ -160,23 +191,8 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["/init"]
 
 FROM web-base AS admin-runtime
-ARG DEBIAN_FRONTEND=noninteractive
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-      default-jre-headless \
-      ffmpeg \
-      fop \
-      ghostscript \
-      imagemagick \
-      poppler-utils; \
-    if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-      sed -i 's#<policy domain="coder" rights="none" pattern="PDF" />#<policy domain="coder" rights="read|write" pattern="PDF" />#g' /etc/ImageMagick-6/policy.xml; \
-    fi; \
-    rm -rf /var/lib/apt/lists/*
+COPY --from=admin-toolchain /tmp/closure/ /
 
 COPY nginx/admin.conf /etc/nginx/nginx.conf
 COPY rootfs/admin/ /
@@ -189,6 +205,8 @@ FROM runtime-base AS cli-runtime
 ARG ATBOX_UID=10001
 ARG ATBOX_GID=10001
 ENV COMPOSER_ALLOW_SUPERUSER=1
+
+COPY --from=cli-toolchain /tmp/closure/ /
 
 RUN set -eux; \
     groupadd --system --gid "${ATBOX_GID}" atbox; \
@@ -212,6 +230,8 @@ FROM job-runtime-base AS worker-runtime
 ARG ATBOX_UID=10001
 ARG ATBOX_GID=10001
 ENV COMPOSER_ALLOW_SUPERUSER=1
+
+COPY --from=worker-toolchain /tmp/closure/ /
 
 RUN set -eux; \
     groupadd --system --gid "${ATBOX_GID}" atbox; \

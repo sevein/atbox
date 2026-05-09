@@ -20,6 +20,17 @@ bats::on_failure() {
   assert_role_marker "${ATBOX_WORKER_SERVICE}" "worker"
 }
 
+@test "role images expose expected Nix toolchains" {
+  media_commands="ffmpeg ffprobe convert identify mogrify composite magick gs ps2pdf pdfinfo pdftotext"
+  media_tools="ffmpeg ghostscript imagemagick poppler-utils"
+
+  assert_toolchain_commands "${ATBOX_PRIMARY_SERVICE}" "" "${media_commands} java fop unzip version-report"
+  assert_toolchain_commands "${ATBOX_REPLICA_SERVICE}" "" "${media_commands} java fop unzip version-report"
+  assert_toolchain_commands "${ATBOX_ADMIN_SERVICE}" "${media_commands} which version-report" "java fop unzip" "${media_tools} which" "java fop unzip"
+  assert_toolchain_commands "${ATBOX_CLI_SERVICE}" "${media_commands} java fop version-report" "unzip" "${media_tools} java fop" "which unzip"
+  assert_toolchain_commands "${ATBOX_WORKER_SERVICE}" "${media_commands} java fop unzip version-report" "" "${media_tools} java fop unzip" "which"
+}
+
 @test "public and admin endpoints answer HTTP requests" {
   wait_for_http_ok "${ATBOX_URL}" 240
   wait_for_http_ok "${ATBOX_REPLICA_URL}" 240

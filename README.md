@@ -68,8 +68,8 @@ shared writable `uploads/` storage and an accompanying worker tier.
 `atbox-worker` bootstraps the same AtoM config, connects to external Gearman,
 and runs `php -d memory_limit=-1 -d error_reporting=E_ALL symfony jobs:worker`
 as the non-root `atbox` user. The image includes the media and document tooling
-used by AtoM jobs, including ImageMagick, Ghostscript, Poppler, FFmpeg, Java,
-and Apache FOP.
+used by AtoM jobs through the Nix-defined worker toolchain, including
+ImageMagick, Ghostscript, Poppler, FFmpeg, Java, Apache FOP, and Unzip.
 
 ### AtoM toolchain
 
@@ -103,6 +103,10 @@ The aggregate packages are:
   aid generation, queued imports, derivative generation, text extraction, and
   SWORD package extraction.
 
+Docker builds use these role-specific Nix aggregates as the source for AtoM
+external command tools in the admin, CLI, and worker images. The public
+read-only image does not include the AtoM toolchain.
+
 Useful Nix commands on Linux, or on another host with a Linux builder:
 
 ```bash
@@ -115,6 +119,8 @@ nix develop
 The toolchain does not include service dependencies or language/runtime
 packages such as MySQL, Elasticsearch, Memcached, Gearman, PHP extensions,
 `nginx`, `s6-overlay`, or the Saxon and XML resolver jars bundled by AtoM.
+Those remain part of the application image, external services, or AtoM source
+tree as appropriate.
 
 ### Cache architecture decisions
 
