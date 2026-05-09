@@ -1,0 +1,47 @@
+[tools.ffmpeg]
+version = "6.1.1"
+binaries = ["ffmpeg", "ffprobe"]
+package = "ffmpeg"
+groups = ["atbox", "admin", "cli", "worker"]
+
+[tools.fop]
+version = "2.8"
+binaries = ["fop"]
+package = "fop"
+groups = ["atbox", "cli", "worker"]
+
+[tools.ghostscript]
+version = "10.03.1"
+binaries = ["gs", "ps2pdf"]
+package = "ghostscript"
+groups = ["atbox", "admin", "cli", "worker"]
+
+[tools.imagemagick]
+version = "7.1.1-34"
+binaries = ["convert", "identify", "mogrify", "composite", "magick"]
+package = "imagemagick"
+groups = ["atbox", "admin", "cli", "worker"]
+
+[tools.java]
+version = "17.0.10"
+binaries = ["java"]
+package = "java"
+groups = ["atbox", "cli", "worker"]
+
+[tools."poppler-utils"]
+version = "24.02.0"
+binaries = ["pdfinfo", "pdftotext"]
+package = "poppler-utils"
+groups = ["atbox", "admin", "cli", "worker"]
+
+[tools.unzip]
+version = "6.0"
+binaries = ["unzip"]
+package = "unzip"
+groups = ["atbox", "worker"]
+
+[tools.which]
+version = "2.21"
+binaries = ["which"]
+package = "which"
+groups = ["atbox", "admin"]

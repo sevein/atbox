@@ -71,6 +71,51 @@ as the non-root `atbox` user. The image includes the media and document tooling
 used by AtoM jobs, including ImageMagick, Ghostscript, Poppler, FFmpeg, Java,
 and Apache FOP.
 
+### AtoM toolchain
+
+The repository includes a Nix flake that defines the external command-line
+tools AtoM expects from the runtime environment. The flake entrypoint remains
+at the repository root, while the tool manifest and Nix implementation live
+under `nix/`. This scope is intentionally limited to tools AtoM shells out to
+directly, plus Ghostscript as the ImageMagick delegate required for PDF
+derivatives. The covered paths are digital object derivatives, PDF text
+extraction, PDF finding aid generation, SWORD package extraction, and small
+command probes:
+
+- ImageMagick: `convert`, `identify`, `mogrify`, `composite`, `magick`
+- Ghostscript: `gs`, `ps2pdf`
+- FFmpeg: `ffmpeg`, `ffprobe`
+- Poppler utilities: `pdfinfo`, `pdftotext`
+- Apache FOP: `fop`
+- Java: `java`
+- Unzip: `unzip`
+- Which: `which`
+
+The aggregate packages are:
+
+- `.#atbox-toolchain`: all managed AtoM tools.
+- `.#atbox-admin-toolchain`: tools needed by admin web paths that can run in
+  the request, including digital object uploads, derivative generation, PDF text
+  extraction, and repository theme image cropping.
+- `.#atbox-cli-toolchain`: tools needed by AtoM CLI tasks that generate digital
+  object derivatives, extract text, or generate finding aids.
+- `.#atbox-worker-toolchain`: tools needed by worker jobs, including finding
+  aid generation, queued imports, derivative generation, text extraction, and
+  SWORD package extraction.
+
+Useful Nix commands on Linux, or on another host with a Linux builder:
+
+```bash
+nix build .#atbox-worker-toolchain
+nix build .#atbox-cli-toolchain
+nix run .#version-report
+nix develop
+```
+
+The toolchain does not include service dependencies or language/runtime
+packages such as MySQL, Elasticsearch, Memcached, Gearman, PHP extensions,
+`nginx`, `s6-overlay`, or the Saxon and XML resolver jars bundled by AtoM.
+
 ### Cache architecture decisions
 
 `atbox` uses external Memcached for application cache and session storage, and
