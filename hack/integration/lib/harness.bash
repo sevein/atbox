@@ -523,6 +523,59 @@ assert_role_marker() {
   echo "Role marker assertion passed for ${service}: ${role}"
 }
 
+assert_toolchain_commands() {
+  local service="${1:?service name required}"
+  local expected_commands="${2:-}"
+  local absent_commands="${3:-}"
+  local expected_report_tools="${4:-}"
+  local absent_report_tools="${5:-}"
+
+  compose run --rm --entrypoint sh "${service}" -lc '
+set -eu
+
+expected_commands="$1"
+absent_commands="$2"
+expected_report_tools="$3"
+absent_report_tools="$4"
+
+for command_name in ${expected_commands}; do
+  if ! command -v "${command_name}" >/dev/null 2>&1; then
+    echo "Expected command is missing: ${command_name}"
+    exit 1
+  fi
+done
+
+for command_name in ${absent_commands}; do
+  if command -v "${command_name}" >/dev/null 2>&1; then
+    echo "Unexpected command is present: ${command_name}"
+    exit 1
+  fi
+done
+
+case " ${expected_commands} " in
+  *" version-report "*)
+    report="$(version-report)"
+
+    for tool_name in ${expected_report_tools}; do
+      if ! printf "%s\n" "${report}" | grep -q "^${tool_name} "; then
+        echo "Expected tool is missing from version-report: ${tool_name}"
+        exit 1
+      fi
+    done
+
+    for tool_name in ${absent_report_tools}; do
+      if printf "%s\n" "${report}" | grep -q "^${tool_name} "; then
+        echo "Unexpected tool is present in version-report: ${tool_name}"
+        exit 1
+      fi
+    done
+    ;;
+esac
+' sh "${expected_commands}" "${absent_commands}" "${expected_report_tools}" "${absent_report_tools}"
+
+  echo "Toolchain command assertions passed for ${service}"
+}
+
 assert_generated_runtime_config() {
   local service="${1:?service name required}"
   local expected_read_only="${2:?expected read_only value required}"
