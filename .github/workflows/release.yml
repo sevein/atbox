@@ -71,12 +71,12 @@ jobs:
       matrix:
         include:
           - role: readonly
-            image: ghcr.io/sevein/atbox
+            image: ghcr.io/sevein/atbox-public
             target: readonly-runtime
             platform: linux/amd64
             runner: ubuntu-24.04
           - role: readonly
-            image: ghcr.io/sevein/atbox
+            image: ghcr.io/sevein/atbox-public
             target: readonly-runtime
             platform: linux/arm64
             runner: ubuntu-24.04-arm
@@ -171,7 +171,7 @@ jobs:
       matrix:
         include:
           - role: readonly
-            image: ghcr.io/sevein/atbox
+            image: ghcr.io/sevein/atbox-public
           - role: admin
             image: ghcr.io/sevein/atbox-admin
           - role: cli

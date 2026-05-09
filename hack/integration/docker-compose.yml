@@ -1,7 +1,7 @@
 name: atbox-integration
 
 x-atbox-common: &atbox-common
-  image: atbox:integration
+  image: atbox-public:integration
   pull_policy: never
   build:
     context: ../..

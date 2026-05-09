@@ -30,7 +30,7 @@ atom:
     annotations: {}
     podAnnotations: {}
     image:
-      repository: ghcr.io/sevein/atbox
+      repository: ghcr.io/sevein/atbox-public
       tag: ""
       pullPolicy: IfNotPresent
     sessionName: ""

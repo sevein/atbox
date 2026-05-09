@@ -19,7 +19,7 @@ tests:
           value: atbox
       - equal:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/sevein/atbox:2.10.1
+          value: ghcr.io/sevein/atbox-public:2.10.1
       - equal:
           path: spec.template.spec.containers[0].env[4]
           value:

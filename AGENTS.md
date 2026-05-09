@@ -47,6 +47,6 @@
 - `image_tag` is always required.
 - `atom_version` is required when `release_images=true`.
 - `chart_version` is required when `release_chart=true`.
-- Published images: `ghcr.io/sevein/atbox`, `ghcr.io/sevein/atbox-admin`,
+- Published images: `ghcr.io/sevein/atbox-public`, `ghcr.io/sevein/atbox-admin`,
   `ghcr.io/sevein/atbox-cli`, `ghcr.io/sevein/atbox-worker`.
 - Helm chart is published as an OCI artifact from `charts/atbox`.

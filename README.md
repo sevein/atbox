@@ -6,7 +6,7 @@ The project is scoped around separating public read traffic from authenticated
 metadata-editing and lifecycle tasks while keeping all roles built from the same
 AtoM source and dependency layers.
 
-- `ghcr.io/sevein/atbox`: public read-only web runtime.
+- `ghcr.io/sevein/atbox-public`: public read-only web runtime.
 - `ghcr.io/sevein/atbox-admin`: authenticated metadata-editing web runtime.
 - `ghcr.io/sevein/atbox-cli`: lifecycle/CLI runtime for one-shot jobs.
 - `ghcr.io/sevein/atbox-worker`: long-running AtoM Gearman worker runtime.
@@ -185,7 +185,7 @@ docker run --rm -p 8080:8080 \
   -e ATOM_MYSQL_DSN='mysql:host=mysql;dbname=atom;charset=utf8mb4' \
   -e ATOM_MYSQL_USERNAME=atom \
   -e ATOM_MYSQL_PASSWORD='replace-me' \
-  ghcr.io/sevein/atbox:<tag>
+  ghcr.io/sevein/atbox-public:<tag>
 ```
 
 Then open `http://localhost:8080`.

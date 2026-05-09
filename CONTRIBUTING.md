@@ -3,7 +3,7 @@
 This repository builds and tests a small AtoM container image family:
 
 - `readonly-runtime`: public read-only web runtime, published as
-  `ghcr.io/sevein/atbox`.
+  `ghcr.io/sevein/atbox-public`.
 - `admin-runtime`: authenticated metadata-editing web runtime, published as
   `ghcr.io/sevein/atbox-admin`.
 - `cli-runtime`: one-shot lifecycle/runtime CLI image, published as
@@ -46,13 +46,13 @@ files under `hack/integration/output/`.
 Build the default readonly image for your host architecture:
 
 ```bash
-docker buildx build --target readonly-runtime -t atbox:dev --load .
+docker buildx build --target readonly-runtime -t atbox-public:dev --load .
 ```
 
 Build all role images explicitly:
 
 ```bash
-docker buildx build --target readonly-runtime -t atbox:dev --load .
+docker buildx build --target readonly-runtime -t atbox-public:dev --load .
 docker buildx build --target admin-runtime -t atbox-admin:dev --load .
 docker buildx build --target cli-runtime -t atbox-cli:dev --load .
 docker buildx build --target worker-runtime -t atbox-worker:dev --load .
@@ -61,8 +61,8 @@ docker buildx build --target worker-runtime -t atbox-worker:dev --load .
 Build for a specific platform when checking multi-architecture behavior:
 
 ```bash
-docker buildx build --platform linux/amd64 --target readonly-runtime -t atbox:amd64 --load .
-docker buildx build --platform linux/arm64 --target readonly-runtime -t atbox:arm64 --load .
+docker buildx build --platform linux/amd64 --target readonly-runtime -t atbox-public:amd64 --load .
+docker buildx build --platform linux/arm64 --target readonly-runtime -t atbox-public:arm64 --load .
 ```
 
 Use `--check` before heavier builds when changing the Dockerfile:
@@ -86,7 +86,7 @@ docker run --rm -p 8080:8080 \
   -e ATOM_MYSQL_DSN='mysql:host=mysql;dbname=atom;charset=utf8mb4' \
   -e ATOM_MYSQL_USERNAME=atom \
   -e ATOM_MYSQL_PASSWORD='replace-me' \
-  atbox:dev
+  atbox-public:dev
 ```
 
 Use `--network <name>` when dependencies are running in a Docker network.
@@ -94,7 +94,7 @@ Use `--network <name>` when dependencies are running in a Docker network.
 Open a shell for quick inspection:
 
 ```bash
-docker run --rm -it --entrypoint sh atbox:dev
+docker run --rm -it --entrypoint sh atbox-public:dev
 ```
 
 Check the CLI image boots and runs a PHP command:
@@ -243,7 +243,7 @@ gh workflow run release.yml \
 When `release_images=true`, the workflow builds and publishes multi-architecture
 manifests for:
 
-- `ghcr.io/sevein/atbox:<image_tag>`
+- `ghcr.io/sevein/atbox-public:<image_tag>`
 - `ghcr.io/sevein/atbox-admin:<image_tag>`
 - `ghcr.io/sevein/atbox-cli:<image_tag>`
 - `ghcr.io/sevein/atbox-worker:<image_tag>`
