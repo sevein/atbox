@@ -39,11 +39,17 @@ jobs:
   validate-release:
     name: "Validate release inputs"
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
+      - name: "Check out repository"
+        uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
       - name: "Validate selected artifacts"
         env:
           RELEASE_IMAGES: ${{ inputs.release_images }}
           RELEASE_CHART: ${{ inputs.release_chart }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
           ATOM_VERSION: ${{ inputs.atom_version }}
           CHART_VERSION: ${{ inputs.chart_version }}
         run: |
@@ -61,6 +67,26 @@ jobs:
             echo "chart_version is required when release_chart is true." >&2
             exit 1
           fi
+
+          tags=()
+          if [[ "${RELEASE_IMAGES}" == "true" ]]; then
+            tags+=("images/${IMAGE_TAG}")
+          fi
+          if [[ "${RELEASE_CHART}" == "true" ]]; then
+            tags+=("charts/atbox/${CHART_VERSION}")
+          fi
+
+          for tag in "${tags[@]}"; do
+            if ! git check-ref-format "refs/tags/${tag}"; then
+              echo "Invalid release tag: ${tag}" >&2
+              exit 1
+            fi
+
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+              echo "Release tag already exists: ${tag}" >&2
+              exit 1
+            fi
+          done
 
   image-build:
     name: "Build ${{ matrix.role }} image (${{ matrix.platform }})"
@@ -258,3 +284,64 @@ jobs:
       - name: "Push Helm chart to GHCR"
         run: |
           nix develop --command helm push "${{ runner.temp }}/atbox-${{ inputs.chart_version }}.tgz" oci://${{ env.GHCR_NAMESPACE }}/charts
+
+  tag-release:
+    name: "Create release git tags"
+    runs-on: ubuntu-24.04
+    needs: [validate-release, image-merge, chart-publish]
+    if: ${{ always() && needs.validate-release.result == 'success' && ((!inputs.release_images && needs.image-merge.result == 'skipped') || (inputs.release_images && needs.image-merge.result == 'success')) && ((!inputs.release_chart && needs.chart-publish.result == 'skipped') || (inputs.release_chart && needs.chart-publish.result == 'success')) }}
+    permissions:
+      contents: write
+    steps:
+      - name: "Check out repository"
+        uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+      - name: "Create annotated release tags"
+        env:
+          RELEASE_IMAGES: ${{ inputs.release_images }}
+          RELEASE_CHART: ${{ inputs.release_chart }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ATOM_VERSION: ${{ inputs.atom_version }}
+          CHART_VERSION: ${{ inputs.chart_version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          tag_refs=()
+
+          if [[ "${RELEASE_IMAGES}" == "true" ]]; then
+            image_tag="images/${IMAGE_TAG}"
+            git tag -a "${image_tag}" -m "$(cat <<EOF
+          atbox images ${IMAGE_TAG}
+
+          artifact-family: images
+          image-tag: ${IMAGE_TAG}
+          atom-version: ${ATOM_VERSION}
+          images:
+          - ${GHCR_NAMESPACE}/atbox-public:${IMAGE_TAG}
+          - ${GHCR_NAMESPACE}/atbox-admin:${IMAGE_TAG}
+          - ${GHCR_NAMESPACE}/atbox-cli:${IMAGE_TAG}
+          - ${GHCR_NAMESPACE}/atbox-worker:${IMAGE_TAG}
+          workflow-run: ${RUN_URL}
+          EOF
+          )"
+            tag_refs+=("refs/tags/${image_tag}")
+          fi
+
+          if [[ "${RELEASE_CHART}" == "true" ]]; then
+            chart_tag="charts/atbox/${CHART_VERSION}"
+            git tag -a "${chart_tag}" -m "$(cat <<EOF
+          atbox chart ${CHART_VERSION}
+
+          artifact-family: chart
+          chart: ${GHCR_NAMESPACE}/charts/atbox:${CHART_VERSION}
+          chart-version: ${CHART_VERSION}
+          app-version: ${IMAGE_TAG}
+          workflow-run: ${RUN_URL}
+          EOF
+          )"
+            tag_refs+=("refs/tags/${chart_tag}")
+          fi
+
+          git push --atomic origin "${tag_refs[@]}"

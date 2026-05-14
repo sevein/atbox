@@ -216,6 +216,16 @@ Image and chart releases are driven by the manual GitHub Actions workflow in
 `.github/workflows/release.yml`. Images and the Helm chart can be released
 together or independently.
 
+Release workflow inputs:
+
+| Input | Required | Used when | Notes |
+| ----- | -------- | --------- | ----- |
+| `image_tag` | Always | Images and chart | Container tag for all role images and chart `appVersion`. |
+| `atom_version` | Images only | `release_images=true` | AtoM source tag downloaded into the image build. |
+| `chart_version` | Chart only | `release_chart=true` | Helm chart package version. |
+| `release_images` | Always | Artifact selection | Publishes the four role images when `true`. |
+| `release_chart` | Always | Artifact selection | Publishes the Helm OCI chart when `true`. |
+
 Trigger images and chart together:
 
 ```bash
@@ -255,11 +265,18 @@ manifests for:
 - `ghcr.io/sevein/atbox-cli:<image_tag>`
 - `ghcr.io/sevein/atbox-worker:<image_tag>`
 
+It also creates an annotated git tag named `images/<image_tag>`, for example
+`images/2.10.1-dev1`.
+
 When `release_chart=true`, it packages `charts/atbox` with the supplied chart
 version and publishes it to GHCR as an OCI Helm artifact. The chart `appVersion`
 is set from `image_tag`; chart-only releases therefore assume that the
 referenced image tag already exists or is intentionally being documented ahead
-of image publication.
+of image publication. It also creates an annotated git tag named
+`charts/atbox/<chart_version>`, for example `charts/atbox/0.1.0`.
+
+The workflow validates selected tag names and fails before publishing if any
+selected release tag already exists.
 
 Before triggering a release, make sure:
 
@@ -267,7 +284,9 @@ Before triggering a release, make sure:
 - Helm lint/template checks pass for all preset values files.
 - `image_tag` matches the intended AtoM/application image version.
 - `atom_version` is set when publishing images.
-- `chart_version` follows SemVer and is not already published when publishing
-  the chart.
+- `images/<image_tag>` does not already exist when publishing images.
+- `chart_version` follows SemVer when publishing the chart.
+- `charts/atbox/<chart_version>` does not already exist when publishing the
+  chart.
 - The release notes identify the AtoM version, image tag, chart version, and any
   migration or deployment notes.

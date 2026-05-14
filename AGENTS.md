@@ -42,6 +42,7 @@
 
 ## Release notes
 
+- Human-facing release process docs live in `CONTRIBUTING.md`.
 - Manual release workflow: `.github/workflows/release.yml`.
 - Select artifacts with `release_images` and `release_chart`.
 - `image_tag` is always required.
