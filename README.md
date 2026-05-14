@@ -209,6 +209,22 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 | `ATOM_SESSION_NAME`            | No         | `ATOM_NAMESPACE` | Session cookie name. Use a distinct value when public/admin tiers should not share login state. |
 | `ATOM_SESSION_COOKIE_SECURE`   | Admin only | `true`           | Set `false` only for local plain-HTTP admin testing.                                            |
 | `ATOM_SESSION_COOKIE_SAMESITE` | Admin only | `lax`            | One of `strict`, `lax`, or `none`.                                                              |
+| `ATOM_OIDC_ENABLED`            | Admin only | `false`          | Enables AtoM's `arOidcPlugin` and makes admin login use OIDC.                                   |
+| `ATOM_OIDC_PROVIDER_URL`       | Admin OIDC | none             | OIDC issuer/provider URL, for example a Keycloak realm URL.                                     |
+| `ATOM_OIDC_CLIENT_ID`          | Admin OIDC | none             | Confidential OIDC client ID used by the AtoM admin web runtime.                                 |
+| `ATOM_OIDC_CLIENT_SECRET`      | Admin OIDC | none             | Confidential OIDC client secret. Use a Kubernetes Secret in Helm deployments.                   |
+| `ATOM_OIDC_REDIRECT_URL`       | Admin OIDC | none             | Public AtoM callback URL, ending in `/index.php/oidc/login`.                                    |
+| `ATOM_OIDC_LOGOUT_REDIRECT_URL` | Admin OIDC | none            | Public URL where the identity provider redirects after logout.                                  |
+| `ATOM_OIDC_SEND_LOGOUT`        | Admin OIDC | `true`           | Sends OIDC logout requests when the provider supports end-session.                              |
+| `ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE` | Admin OIDC | `true`    | Allows AtoM to use refresh tokens when the provider issues them.                                |
+| `ATOM_OIDC_SERVER_CERT`        | Admin OIDC | `false`          | Certificate path for provider validation, or `false` for local/test deployments.                |
+| `ATOM_OIDC_SET_GROUPS_FROM_ATTRIBUTES` | Admin OIDC | `true` | Maps OIDC role claims into AtoM ACL group membership.                                           |
+| `ATOM_OIDC_SCOPES`             | Admin OIDC | `openid,profile,email` | Comma-separated OIDC scopes.                                                              |
+| `ATOM_OIDC_ROLES_SOURCE`       | Admin OIDC | `access-token`   | Token source for role claims.                                                                  |
+| `ATOM_OIDC_ROLES_PATH`         | Admin OIDC | `realm_access,roles` | Comma-separated path to role claims.                                                       |
+| `ATOM_OIDC_USER_MATCHING_SOURCE` | Admin OIDC | `oidc-email`    | One of `oidc-email` or `oidc-username`.                                                         |
+| `ATOM_OIDC_AUTO_CREATE_ATOM_USER` | Admin OIDC | `true`         | Creates missing AtoM users from trusted OIDC claims.                                            |
+| `ATOM_OIDC_USER_GROUPS_JSON`   | Admin OIDC | built-in AtoM group mappings | JSON role-to-group map for AtoM ACL groups.                                          |
 | `ATOM_UPLOADS_ENABLED`         | Admin only | `false`          | Enables PHP uploads and AtoM upload UI when shared writable storage is mounted.                  |
 | `ATOM_UPLOAD_LIMIT`            | Admin only | `-1`             | AtoM upload limit in gigabytes; `0` disables uploads, `-1` is unlimited.                         |
 | `ATOM_PHP_POST_MAX_SIZE`       | Admin only | `512M`           | PHP `post_max_size` when uploads are enabled.                                                    |
@@ -233,3 +249,43 @@ helm template atbox charts/atbox \
 The chart exposes annotation maps on Deployments, Pods, Services, Jobs, and the
 database Secret for GitOps tools such as Argo CD. Worker deployments require
 existing PVCs for shared `uploads/` and `downloads/` storage.
+
+Admin OIDC can be enabled through `atom.admin.oidc`. Use a dedicated
+confidential identity-provider client for AtoM admin sessions and store the
+client secret in a Kubernetes Secret:
+
+```yaml
+atom:
+  admin:
+    enabled: true
+    oidc:
+      enabled: true
+      providerUrl: https://keycloak.example.org/realms/atom
+      clientId: atom-admin
+      clientSecret:
+        existingSecret: atom-admin-oidc
+        key: client-secret
+      redirectUrl: https://atom.example.org/index.php/oidc/login
+      logoutRedirectUrl: https://atom.example.org
+```
+
+Enabling OIDC automates the AtoM runtime configuration in the admin container:
+the image enables `arOidcPlugin`, switches admin login to the OIDC module, uses
+`oidcUser`, and writes the plugin provider configuration at startup. It does not
+create the identity-provider client, migrate local AtoM users into the identity
+provider, or guarantee account linking.
+
+Before switching an existing admin deployment to OIDC:
+
+- Create a dedicated confidential OIDC client for AtoM admin login.
+- Add the AtoM callback URL to the client redirect allowlist.
+- Choose `oidc-email` or `oidc-username` matching deliberately.
+- Verify existing AtoM users have matching email or username claims in the
+  identity provider.
+- Configure role claims and `userGroups` before allowing users to sign in.
+- Set `autoCreateAtomUser: false` if every admin user must be pre-created and
+  explicitly matched.
+
+When OIDC is enabled, admin login is OIDC-only. Existing local AtoM passwords
+remain in the database but are no longer the admin web login path for that
+runtime.

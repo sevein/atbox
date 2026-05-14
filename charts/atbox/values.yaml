@@ -52,6 +52,42 @@ atom:
     sessionName: atom-admin
     sessionCookieSecure: true
     sessionCookieSameSite: lax
+    oidc:
+      enabled: false
+      providerUrl: ""
+      clientId: ""
+      clientSecret:
+        existingSecret: ""
+        key: client-secret
+      redirectUrl: ""
+      logoutRedirectUrl: ""
+      sendOidcLogout: true
+      enableRefreshTokenUse: true
+      serverCert: "false"
+      setGroupsFromAttributes: true
+      scopes:
+        - openid
+        - profile
+        - email
+      rolesSource: access-token
+      rolesPath:
+        - realm_access
+        - roles
+      userMatchingSource: oidc-email
+      autoCreateAtomUser: true
+      userGroups:
+        administrator:
+          attributeValue: atom-admin
+          groupId: 100
+        editor:
+          attributeValue: atom-editor
+          groupId: 101
+        contributor:
+          attributeValue: atom-contributor
+          groupId: 102
+        translator:
+          attributeValue: atom-translator
+          groupId: 103
     uploads:
       enabled: false
       limit: "-1"

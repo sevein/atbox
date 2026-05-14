@@ -306,6 +306,7 @@
         "sessionName",
         "sessionCookieSecure",
         "sessionCookieSameSite",
+        "oidc",
         "uploads",
         "service",
         "resources"
@@ -340,6 +341,130 @@
             "lax",
             "none"
           ]
+        },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "providerUrl",
+            "clientId",
+            "clientSecret",
+            "redirectUrl",
+            "logoutRedirectUrl",
+            "sendOidcLogout",
+            "enableRefreshTokenUse",
+            "serverCert",
+            "setGroupsFromAttributes",
+            "scopes",
+            "rolesSource",
+            "rolesPath",
+            "userMatchingSource",
+            "autoCreateAtomUser",
+            "userGroups"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "providerUrl": {
+              "type": "string"
+            },
+            "clientId": {
+              "type": "string"
+            },
+            "clientSecret": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "existingSecret",
+                "key"
+              ],
+              "properties": {
+                "existingSecret": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "redirectUrl": {
+              "type": "string"
+            },
+            "logoutRedirectUrl": {
+              "type": "string"
+            },
+            "sendOidcLogout": {
+              "type": "boolean"
+            },
+            "enableRefreshTokenUse": {
+              "type": "boolean"
+            },
+            "serverCert": {
+              "type": "string"
+            },
+            "setGroupsFromAttributes": {
+              "type": "boolean"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "rolesSource": {
+              "type": "string",
+              "enum": [
+                "access-token",
+                "id-token",
+                "verified-claims",
+                "user-info"
+              ]
+            },
+            "rolesPath": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            "userMatchingSource": {
+              "type": "string",
+              "enum": [
+                "oidc-email",
+                "oidc-username"
+              ]
+            },
+            "autoCreateAtomUser": {
+              "type": "boolean"
+            },
+            "userGroups": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attributeValue",
+                  "groupId"
+                ],
+                "properties": {
+                  "attributeValue": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "groupId": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
         },
         "uploads": {
           "type": "object",

@@ -72,6 +72,23 @@ function phpSingleQuoted(string $value): string
     return str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
 }
 
+function yamlSingleQuoted(string $value): string
+{
+    return "'".str_replace("'", "''", $value)."'";
+}
+
+function yamlStringList(array $values, int $indent): string
+{
+    $prefix = str_repeat(' ', $indent);
+    $lines = [];
+
+    foreach ($values as $value) {
+        $lines[] = $prefix.'- '.yamlSingleQuoted((string) $value);
+    }
+
+    return implode("\n", $lines);
+}
+
 function writeFile(string $path, string $contents): void
 {
     $dir = dirname($path);
@@ -151,6 +168,103 @@ function validateSimpleName(string $name, string $value): void
     }
 }
 
+function envListOrDefault(string $name, array $default): array
+{
+    $value = envOrDefault($name, '');
+    if ('' === trim($value)) {
+        return $default;
+    }
+
+    $items = array_values(array_filter(array_map('trim', explode(',', $value)), 'strlen'));
+    if ([] === $items) {
+        fwrite(STDERR, "{$name} must contain at least one non-empty value\n");
+        exit(1);
+    }
+
+    return $items;
+}
+
+function oidcUserGroupsFromEnv(): array
+{
+    $json = envOrDefault('ATOM_OIDC_USER_GROUPS_JSON', '');
+    if ('' === trim($json)) {
+        return [
+            'administrator' => ['attribute_value' => 'atom-admin', 'group_id' => 100],
+            'editor' => ['attribute_value' => 'atom-editor', 'group_id' => 101],
+            'contributor' => ['attribute_value' => 'atom-contributor', 'group_id' => 102],
+            'translator' => ['attribute_value' => 'atom-translator', 'group_id' => 103],
+        ];
+    }
+
+    $decoded = json_decode($json, true);
+    if (!is_array($decoded)) {
+        fwrite(STDERR, "ATOM_OIDC_USER_GROUPS_JSON must be a JSON object\n");
+        exit(1);
+    }
+
+    $groups = [];
+    foreach ($decoded as $name => $group) {
+        if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]+$/', $name)) {
+            fwrite(STDERR, "ATOM_OIDC_USER_GROUPS_JSON group names may contain only letters, numbers, '_' or '-'\n");
+            exit(1);
+        }
+        if (!is_array($group)) {
+            fwrite(STDERR, "ATOM_OIDC_USER_GROUPS_JSON group {$name} must be an object\n");
+            exit(1);
+        }
+
+        $attributeValue = $group['attribute_value'] ?? $group['attributeValue'] ?? null;
+        $groupId = $group['group_id'] ?? $group['groupId'] ?? null;
+        if (!is_string($attributeValue) || '' === trim($attributeValue)) {
+            fwrite(STDERR, "ATOM_OIDC_USER_GROUPS_JSON group {$name} requires attribute_value\n");
+            exit(1);
+        }
+        if (!is_int($groupId) && !(is_string($groupId) && preg_match('/^[0-9]+$/', $groupId))) {
+            fwrite(STDERR, "ATOM_OIDC_USER_GROUPS_JSON group {$name} requires numeric group_id\n");
+            exit(1);
+        }
+
+        $groups[$name] = [
+            'attribute_value' => $attributeValue,
+            'group_id' => (int) $groupId,
+        ];
+    }
+
+    return $groups;
+}
+
+function oidcUserGroupsYaml(array $groups, int $indent): string
+{
+    $prefix = str_repeat(' ', $indent);
+    $lines = [];
+
+    foreach ($groups as $name => $group) {
+        $lines[] = $prefix.$name.':';
+        $lines[] = $prefix.'  attribute_value: '.yamlSingleQuoted($group['attribute_value']);
+        $lines[] = $prefix.'  group_id: '.$group['group_id'];
+    }
+
+    return implode("\n", $lines);
+}
+
+function configureLoginModule(string $module): void
+{
+    $path = ATOM_DIR.'/apps/qubit/config/settings.yml';
+    if (!is_readable($path)) {
+        fwrite(STDERR, "AtoM settings file not found at {$path}\n");
+        exit(1);
+    }
+
+    $settings = file_get_contents($path);
+    $updated = preg_replace('/(^\s*login_module:\s*)[A-Za-z0-9_-]+/m', '${1}'.$module, $settings, 1, $count);
+    if (1 !== $count || null === $updated) {
+        fwrite(STDERR, "Unable to configure AtoM login_module in {$path}\n");
+        exit(1);
+    }
+
+    writeFile($path, $updated);
+}
+
 $role = roleOrFail();
 $legacyNamespace = envOrDefault('ATOM_NAMESPACE', 'atom');
 $config = [
@@ -177,6 +291,7 @@ $phpPostMaxSize = $uploadsEnabled ? envOrDefault('ATOM_PHP_POST_MAX_SIZE', '512M
 $phpFileUploads = $uploadsEnabled ? 'On' : 'Off';
 $phpUploadMaxFilesize = $uploadsEnabled ? envOrDefault('ATOM_PHP_UPLOAD_MAX_FILESIZE', '512M') : '0';
 $phpMaxFileUploads = $uploadsEnabled ? envOrDefault('ATOM_PHP_MAX_FILE_UPLOADS', '20') : '0';
+$oidcEnabled = boolEnvOrDefault('ATOM_OIDC_ENABLED', false);
 
 if (!is_dir(ATOM_DIR)) {
     fwrite(STDERR, 'AtoM source tree not found at '.ATOM_DIR."\n");
@@ -209,6 +324,11 @@ if (!in_array($sessionCookieSameSite, ['strict', 'lax', 'none'], true)) {
     exit(1);
 }
 
+if ($oidcEnabled && 'admin' !== $role) {
+    fwrite(STDERR, "ATOM_OIDC_ENABLED is supported only by the admin role\n");
+    exit(1);
+}
+
 if (!file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml') && file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl')) {
     copy(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl', ATOM_DIR.'/apps/qubit/config/settings.yml');
 }
@@ -221,12 +341,48 @@ if (file_exists(ATOM_DIR.'/config/propel.ini.tmpl')) {
     copy(ATOM_DIR.'/config/propel.ini.tmpl', ATOM_DIR.'/config/propel.ini');
 }
 
+if ($oidcEnabled) {
+    $oidcConfig = [
+        'provider_url' => envOrFail('ATOM_OIDC_PROVIDER_URL'),
+        'client_id' => envOrFail('ATOM_OIDC_CLIENT_ID'),
+        'client_secret' => envOrFail('ATOM_OIDC_CLIENT_SECRET'),
+        'redirect_url' => envOrFail('ATOM_OIDC_REDIRECT_URL'),
+        'logout_redirect_url' => envOrFail('ATOM_OIDC_LOGOUT_REDIRECT_URL'),
+        'send_oidc_logout' => boolEnvOrDefault('ATOM_OIDC_SEND_LOGOUT', true),
+        'enable_refresh_token_use' => boolEnvOrDefault('ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE', true),
+        'server_cert' => envOrDefault('ATOM_OIDC_SERVER_CERT', 'false'),
+        'set_groups_from_attributes' => boolEnvOrDefault('ATOM_OIDC_SET_GROUPS_FROM_ATTRIBUTES', true),
+        'scopes' => envListOrDefault('ATOM_OIDC_SCOPES', ['openid', 'profile', 'email']),
+        'roles_source' => envOrDefault('ATOM_OIDC_ROLES_SOURCE', 'access-token'),
+        'roles_path' => envListOrDefault('ATOM_OIDC_ROLES_PATH', ['realm_access', 'roles']),
+        'user_matching_source' => envOrDefault('ATOM_OIDC_USER_MATCHING_SOURCE', 'oidc-email'),
+        'auto_create_atom_user' => boolEnvOrDefault('ATOM_OIDC_AUTO_CREATE_ATOM_USER', true),
+        'user_groups' => oidcUserGroupsFromEnv(),
+    ];
+
+    if (!in_array($oidcConfig['roles_source'], ['access-token', 'id-token', 'verified-claims', 'user-info'], true)) {
+        fwrite(STDERR, "ATOM_OIDC_ROLES_SOURCE must be one of access-token, id-token, verified-claims, or user-info\n");
+        exit(1);
+    }
+    if (!in_array($oidcConfig['user_matching_source'], ['oidc-email', 'oidc-username'], true)) {
+        fwrite(STDERR, "ATOM_OIDC_USER_MATCHING_SOURCE must be oidc-email or oidc-username\n");
+        exit(1);
+    }
+
+    writeFile(ATOM_DIR.'/activate-oidc-plugin', '');
+    configureLoginModule('oidc');
+} else {
+    @unlink(ATOM_DIR.'/activate-oidc-plugin');
+    configureLoginModule('user');
+}
+
 $elasticsearch = hostPort($config['atom.elasticsearch_host'], 9200);
 $memcached = hostPort($config['atom.memcached_host'], 11211);
 $gearman = hostPort($config['atom.gearman_host'], 4730);
 $readOnlyYaml = yamlBool($readOnly);
 $fpmReadOnly = $readOnly ? 'on' : 'off';
 $sessionCookieSecureYaml = yamlBool($sessionCookieSecure);
+$oidcUserFactoryYaml = $oidcEnabled ? "\n  user:\n    class: oidcUser\n    param:\n      timeout: 1800\n" : '';
 $workersKey = $config['atom.workers_key'];
 $gearmanWorkerTypesYaml = gearmanWorkerTypesYaml(ATOM_DIR.'/config/gearman.yml')
     ?: gearmanWorkerTypesYaml(ATOM_DIR.'/apps/qubit/config/gearman.yml');
@@ -314,6 +470,7 @@ dev:
           persistent: true
 
 all:
+{$oidcUserFactoryYaml}
   i18n:
     class: sfTranslateI18N
     param:
@@ -345,6 +502,55 @@ all:
             stream: php://stderr
 YAML
 );
+
+if ($oidcEnabled) {
+    $serverCert = 'false' === strtolower($oidcConfig['server_cert'])
+        ? 'false'
+        : yamlSingleQuoted($oidcConfig['server_cert']);
+    $providerUrl = yamlSingleQuoted($oidcConfig['provider_url']);
+    $clientId = yamlSingleQuoted($oidcConfig['client_id']);
+    $clientSecret = yamlSingleQuoted($oidcConfig['client_secret']);
+    $sendOidcLogout = yamlBool($oidcConfig['send_oidc_logout']);
+    $enableRefreshTokenUse = yamlBool($oidcConfig['enable_refresh_token_use']);
+    $setGroupsFromAttributes = yamlBool($oidcConfig['set_groups_from_attributes']);
+    $userGroups = oidcUserGroupsYaml($oidcConfig['user_groups'], 10);
+    $scopes = yamlStringList($oidcConfig['scopes'], 10);
+    $rolesSource = yamlSingleQuoted($oidcConfig['roles_source']);
+    $rolesPath = yamlStringList($oidcConfig['roles_path'], 10);
+    $userMatchingSource = yamlSingleQuoted($oidcConfig['user_matching_source']);
+    $autoCreateAtomUser = yamlBool($oidcConfig['auto_create_atom_user']);
+    $redirectUrl = yamlSingleQuoted($oidcConfig['redirect_url']);
+    $logoutRedirectUrl = yamlSingleQuoted($oidcConfig['logout_redirect_url']);
+    writeFile(
+        ATOM_DIR.'/plugins/arOidcPlugin/config/app.yml',
+        <<<YAML
+all:
+  oidc:
+    providers:
+      primary:
+        url: {$providerUrl}
+        client_id: {$clientId}
+        client_secret: {$clientSecret}
+        send_oidc_logout: {$sendOidcLogout}
+        enable_refresh_token_use: {$enableRefreshTokenUse}
+        server_cert: {$serverCert}
+        set_groups_from_attributes: {$setGroupsFromAttributes}
+        user_groups:
+{$userGroups}
+        scopes:
+{$scopes}
+        roles_source: {$rolesSource}
+        roles_path:
+{$rolesPath}
+        user_matching_source: {$userMatchingSource}
+        auto_create_atom_user: {$autoCreateAtomUser}
+    primary_provider_name: primary
+    redirect_url: {$redirectUrl}
+    logout_redirect_url: {$logoutRedirectUrl}
+
+YAML
+    );
+}
 
 writeFile(
     ATOM_DIR.'/config/search.yml',

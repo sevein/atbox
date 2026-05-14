@@ -2,6 +2,27 @@
 {{- if and .Values.atom.admin.uploads.enabled (or (not .Values.storage.uploads.existingClaim) (not .Values.storage.downloads.existingClaim)) }}
 {{- fail "atom.admin.uploads.enabled requires storage.uploads.existingClaim and storage.downloads.existingClaim so admin, public, and worker share AtoM-generated files" }}
 {{- end }}
+{{- $oidc := .Values.atom.admin.oidc }}
+{{- if $oidc.enabled }}
+{{- if not $oidc.providerUrl }}
+{{- fail "atom.admin.oidc.providerUrl is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- if not $oidc.clientId }}
+{{- fail "atom.admin.oidc.clientId is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- if not $oidc.clientSecret.existingSecret }}
+{{- fail "atom.admin.oidc.clientSecret.existingSecret is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- if not $oidc.clientSecret.key }}
+{{- fail "atom.admin.oidc.clientSecret.key is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- if not $oidc.redirectUrl }}
+{{- fail "atom.admin.oidc.redirectUrl is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- if not $oidc.logoutRedirectUrl }}
+{{- fail "atom.admin.oidc.logoutRedirectUrl is required when atom.admin.oidc.enabled=true" }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,6 +80,43 @@ spec:
               value: {{ .Values.atom.admin.sessionCookieSecure | quote }}
             - name: ATOM_SESSION_COOKIE_SAMESITE
               value: {{ .Values.atom.admin.sessionCookieSameSite | quote }}
+            {{- if $oidc.enabled }}
+            - name: ATOM_OIDC_ENABLED
+              value: "true"
+            - name: ATOM_OIDC_PROVIDER_URL
+              value: {{ $oidc.providerUrl | quote }}
+            - name: ATOM_OIDC_CLIENT_ID
+              value: {{ $oidc.clientId | quote }}
+            - name: ATOM_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $oidc.clientSecret.existingSecret | quote }}
+                  key: {{ $oidc.clientSecret.key | quote }}
+            - name: ATOM_OIDC_REDIRECT_URL
+              value: {{ $oidc.redirectUrl | quote }}
+            - name: ATOM_OIDC_LOGOUT_REDIRECT_URL
+              value: {{ $oidc.logoutRedirectUrl | quote }}
+            - name: ATOM_OIDC_SEND_LOGOUT
+              value: {{ $oidc.sendOidcLogout | quote }}
+            - name: ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE
+              value: {{ $oidc.enableRefreshTokenUse | quote }}
+            - name: ATOM_OIDC_SERVER_CERT
+              value: {{ $oidc.serverCert | quote }}
+            - name: ATOM_OIDC_SET_GROUPS_FROM_ATTRIBUTES
+              value: {{ $oidc.setGroupsFromAttributes | quote }}
+            - name: ATOM_OIDC_SCOPES
+              value: {{ join "," $oidc.scopes | quote }}
+            - name: ATOM_OIDC_ROLES_SOURCE
+              value: {{ $oidc.rolesSource | quote }}
+            - name: ATOM_OIDC_ROLES_PATH
+              value: {{ join "," $oidc.rolesPath | quote }}
+            - name: ATOM_OIDC_USER_MATCHING_SOURCE
+              value: {{ $oidc.userMatchingSource | quote }}
+            - name: ATOM_OIDC_AUTO_CREATE_ATOM_USER
+              value: {{ $oidc.autoCreateAtomUser | quote }}
+            - name: ATOM_OIDC_USER_GROUPS_JSON
+              value: {{ toJson $oidc.userGroups | quote }}
+            {{- end }}
             - name: ATOM_UPLOADS_ENABLED
               value: {{ .Values.atom.admin.uploads.enabled | quote }}
             - name: ATOM_UPLOAD_LIMIT
