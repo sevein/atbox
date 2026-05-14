@@ -265,6 +265,55 @@ function configureLoginModule(string $module): void
     writeFile($path, $updated);
 }
 
+function configureProjectPlugin(string $plugin, bool $enabled): void
+{
+    $path = ATOM_DIR.'/config/ProjectConfiguration.class.php';
+    if (!is_readable($path)) {
+        fwrite(STDERR, "AtoM project configuration file not found at {$path}\n");
+        exit(1);
+    }
+
+    $configuration = file_get_contents($path);
+    $managedLinePattern = '/^[ \t]*[\'"]'.preg_quote($plugin, '/').'[\'"]\s*,\s*\/\/ Managed by atbox-bootstrap\R/m';
+    $configuration = preg_replace($managedLinePattern, '', $configuration) ?? $configuration;
+
+    if (!$enabled) {
+        writeFile($path, $configuration);
+
+        return;
+    }
+
+    $pattern = '/(\$plugins\s*=\s*\[\s*\R)(.*?)(^[ \t]*\];)/ms';
+    $updated = preg_replace_callback(
+        $pattern,
+        function (array $matches) use ($plugin): string {
+            if (preg_match('/[\'"]'.preg_quote($plugin, '/').'[\'"]/', $matches[2])) {
+                return $matches[0];
+            }
+
+            $indent = '      ';
+            if (preg_match('/^([ \t]*)[\'"][A-Za-z0-9_]+Plugin[\'"]\s*,/m', $matches[2], $indentMatch)) {
+                $indent = $indentMatch[1];
+            }
+
+            return $matches[1]
+                .$matches[2]
+                .$indent."'".$plugin."', // Managed by atbox-bootstrap\n"
+                .$matches[3];
+        },
+        $configuration,
+        1,
+        $count
+    );
+
+    if (1 !== $count || null === $updated) {
+        fwrite(STDERR, "Unable to configure AtoM plugin {$plugin} in {$path}\n");
+        exit(1);
+    }
+
+    writeFile($path, $updated);
+}
+
 $role = roleOrFail();
 $legacyNamespace = envOrDefault('ATOM_NAMESPACE', 'atom');
 $config = [
@@ -369,10 +418,12 @@ if ($oidcEnabled) {
         exit(1);
     }
 
-    writeFile(ATOM_DIR.'/activate-oidc-plugin', '');
+    @unlink(ATOM_DIR.'/activate-oidc-plugin');
+    configureProjectPlugin('arOidcPlugin', true);
     configureLoginModule('oidc');
 } else {
     @unlink(ATOM_DIR.'/activate-oidc-plugin');
+    configureProjectPlugin('arOidcPlugin', false);
     configureLoginModule('user');
 }
 

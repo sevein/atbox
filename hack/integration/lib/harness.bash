@@ -605,6 +605,29 @@ SH
   echo "Generated runtime config assertions passed for ${service}"
 }
 
+assert_admin_oidc_bootstrap_config() {
+  compose run --rm \
+    --no-deps \
+    --entrypoint sh \
+    -e ATOM_OIDC_ENABLED=true \
+    -e ATOM_OIDC_PROVIDER_URL=https://keycloak.example.org/realms/atom \
+    -e ATOM_OIDC_CLIENT_ID=atom-admin \
+    -e ATOM_OIDC_CLIENT_SECRET=secret \
+    -e ATOM_OIDC_REDIRECT_URL=https://atom.example.org/index.php/oidc/login \
+    -e ATOM_OIDC_LOGOUT_REDIRECT_URL=https://atom.example.org \
+    "${ATBOX_ADMIN_SERVICE}" \
+    -lc '
+set -eu
+php /usr/local/bin/atbox-bootstrap.php
+grep -q "arOidcPlugin.*Managed by atbox-bootstrap" /atom/src/config/ProjectConfiguration.class.php
+grep -Eq "login_module:[[:space:]]*oidc" /atom/src/apps/qubit/config/settings.yml
+grep -q "class: oidcUser" /atom/src/apps/qubit/config/factories.yml
+grep -q "primary_provider_name: primary" /atom/src/plugins/arOidcPlugin/config/app.yml
+' || return 1
+
+  echo "Admin OIDC bootstrap config assertions passed"
+}
+
 assert_worker_default_abilities() {
   local ability_count deadline
 

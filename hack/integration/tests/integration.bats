@@ -45,6 +45,10 @@ bats::on_failure() {
   assert_generated_runtime_config "${ATBOX_WORKER_SERVICE}" "false" "atbox-it" "true"
 }
 
+@test "admin OIDC bootstrap enables plugin-backed login" {
+  assert_admin_oidc_bootstrap_config
+}
+
 @test "runtime roles run hardened and rootless" {
   assert_runtime_hardening "${ATBOX_PRIMARY_SERVICE}"
   assert_runtime_hardening "${ATBOX_REPLICA_SERVICE}"
