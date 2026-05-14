@@ -11,33 +11,25 @@ jobs:
   helm:
     name: Helm
     runs-on: ubuntu-24.04
-    env:
-      KUBECONFORM_VERSION: v0.7.0
-      HELM_UNITTEST_VERSION: v1.0.3
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@v3
       - name: Lint chart presets
         run: |
-          helm lint charts/atbox --values charts/atbox/values-readonly-attached.yaml
-          helm lint charts/atbox --values charts/atbox/values-admin-attached.yaml
-          helm lint charts/atbox --values charts/atbox/values-public-plus-admin.yaml
-      - name: Install helm-unittest
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}"
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-readonly-attached.yaml
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-admin-attached.yaml
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-public-plus-admin.yaml
       - name: Run Helm unit tests
-        run: helm unittest charts/atbox
+        run: nix develop --command helm unittest charts/atbox
       - name: Render chart presets
         run: |
-          helm template atbox charts/atbox --values charts/atbox/values-readonly-attached.yaml >/dev/null
-          helm template atbox charts/atbox --values charts/atbox/values-admin-attached.yaml >/dev/null
-          helm template atbox charts/atbox --values charts/atbox/values-public-plus-admin.yaml >/dev/null
-      - name: Install kubeconform
-        run: |
-          curl -LfsS "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | tar -xzf - kubeconform
-          sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
+          nix develop --command helm template atbox charts/atbox --values charts/atbox/values-readonly-attached.yaml >/dev/null
+          nix develop --command helm template atbox charts/atbox --values charts/atbox/values-admin-attached.yaml >/dev/null
+          nix develop --command helm template atbox charts/atbox --values charts/atbox/values-public-plus-admin.yaml >/dev/null
       - name: Validate rendered chart manifests
-        run: ./hack/helm-kubeconform.sh
+        run: nix develop --command ./hack/helm-kubeconform.sh
 
   integration:
     name: Integration

@@ -202,9 +202,13 @@ jobs:
       - name: "Create manifest list and push to GHCR"
         working-directory: ${{ runner.temp }}/digests-ghcr-${{ matrix.role }}
         run: |
+          refs=()
+          for digest in *; do
+            refs+=("${{ matrix.image }}@sha256:${digest}")
+          done
           docker buildx imagetools create \
-            -t ${{ matrix.image }}:${{ inputs.image_tag }} \
-            $(printf '${{ matrix.image }}@sha256:%s ' *)
+            -t "${{ matrix.image }}:${{ inputs.image_tag }}" \
+            "${refs[@]}"
 
       - name: "Inspect image"
         run: |
@@ -215,15 +219,15 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [validate-release, image-merge]
     if: ${{ always() && inputs.release_chart && needs.validate-release.result == 'success' && ((!inputs.release_images && needs.image-merge.result == 'skipped') || (inputs.release_images && needs.image-merge.result == 'success')) }}
-    env:
-      KUBECONFORM_VERSION: v0.7.0
-      HELM_UNITTEST_VERSION: v1.0.3
     permissions:
       contents: read
       packages: write
     steps:
       - name: "Check out repository"
         uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
+
+      - name: "Install Nix"
+        uses: "DeterminateSystems/determinate-nix-action@v3"
 
       - name: "Log in to GitHub Container Registry"
         uses: "docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121" # v4.1.0
@@ -234,32 +238,23 @@ jobs:
 
       - name: "Log Helm in to GitHub Container Registry"
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+          echo "${{ secrets.GITHUB_TOKEN }}" | nix develop --command helm registry login ghcr.io \
             --username "${{ github.actor }}" \
             --password-stdin
 
-      - name: "Install kubeconform"
-        run: |
-          curl -LfsS "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | tar -xzf - kubeconform
-          sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
-
-      - name: "Install helm-unittest"
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}"
-
       - name: "Package Helm chart"
         run: |
-          helm dependency update charts/atbox
-          helm lint charts/atbox --values charts/atbox/values-readonly-attached.yaml
-          helm lint charts/atbox --values charts/atbox/values-admin-attached.yaml
-          helm lint charts/atbox --values charts/atbox/values-public-plus-admin.yaml
-          helm unittest charts/atbox
-          ./hack/helm-kubeconform.sh
-          helm package charts/atbox \
+          nix develop --command helm dependency update charts/atbox
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-readonly-attached.yaml
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-admin-attached.yaml
+          nix develop --command helm lint charts/atbox --values charts/atbox/values-public-plus-admin.yaml
+          nix develop --command helm unittest charts/atbox
+          nix develop --command ./hack/helm-kubeconform.sh
+          nix develop --command helm package charts/atbox \
             --version "${{ inputs.chart_version }}" \
             --app-version "${{ inputs.image_tag }}" \
             --destination "${{ runner.temp }}"
 
       - name: "Push Helm chart to GHCR"
         run: |
-          helm push "${{ runner.temp }}/atbox-${{ inputs.chart_version }}.tgz" oci://${{ env.GHCR_NAMESPACE }}/charts
+          nix develop --command helm push "${{ runner.temp }}/atbox-${{ inputs.chart_version }}.tgz" oci://${{ env.GHCR_NAMESPACE }}/charts

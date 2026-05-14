@@ -19,10 +19,17 @@ their own targets.
 
 - Docker with Buildx and Compose v2.
 - Node.js/npm for integration browser checks.
-- Helm 3 for chart validation.
-- helm-unittest plugin for chart unit tests.
-- kubeconform for rendered Kubernetes manifest validation.
 - GitHub CLI only if triggering releases from the command line.
+
+Use the Nix development shell for chart tooling and the AtoM external toolchain:
+
+```bash
+nix develop
+```
+
+The development shell provides Helm, the helm-unittest plugin, kubeconform, and
+on Linux also includes the command-line tools that AtoM expects in the role
+images.
 
 The integration runner installs npm dependencies from
 `hack/integration/package-lock.json` and stores generated browser/cache/output
