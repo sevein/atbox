@@ -5,6 +5,7 @@
 - Builds AtoM container images for readonly web, admin web, CLI, and worker roles.
 - Runtime roles are Dockerfile targets: `readonly-runtime`, `admin-runtime`,
   `cli-runtime`, `worker-runtime`.
+- Worker toolchain-only image target is `worker-toolchain-runtime`.
 - Root filesystem additions are split across `rootfs/base`, `rootfs/readonly`,
   `rootfs/admin`, `rootfs/cli`, and `rootfs/worker`.
 - Helm chart lives in `charts/atbox`.
@@ -17,6 +18,7 @@
   - `docker buildx build --target admin-runtime --check .`
   - `docker buildx build --target cli-runtime --check .`
   - `docker buildx build --target worker-runtime --check .`
+  - `docker buildx build --target worker-toolchain-runtime --check .`
 - Full integration suite: `./hack/integration/run.sh`
 - Integration assertions live in `hack/integration/tests/*.bats`.
 - Keep failed integration stack up: `KEEP_UP=1 ./hack/integration/run.sh`
@@ -49,5 +51,6 @@
 - `atom_version` is required when `release_images=true`.
 - `chart_version` is required when `release_chart=true`.
 - Published images: `ghcr.io/sevein/atbox-public`, `ghcr.io/sevein/atbox-admin`,
-  `ghcr.io/sevein/atbox-cli`, `ghcr.io/sevein/atbox-worker`.
+  `ghcr.io/sevein/atbox-cli`, `ghcr.io/sevein/atbox-worker`, and
+  `ghcr.io/sevein/atbox-worker-toolchain`.
 - Helm chart is published as an OCI artifact from `charts/atbox`.

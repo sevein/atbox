@@ -31,6 +31,10 @@ bats::on_failure() {
   assert_toolchain_commands "${ATBOX_WORKER_SERVICE}" "${media_commands} java fop unzip version-report" "" "${media_tools} java fop unzip" "which"
 }
 
+@test "worker toolchain image exposes only the Nix toolchain closure" {
+  assert_worker_toolchain_image
+}
+
 @test "public and admin endpoints answer HTTP requests" {
   wait_for_http_ok "${ATBOX_URL}" 240
   wait_for_http_ok "${ATBOX_REPLICA_URL}" 240

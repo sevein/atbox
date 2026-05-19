@@ -63,7 +63,7 @@ let
     pkgs.writeShellApplication {
       name = "version-report";
       text = ''
-        cat ${versionManifest}
+        ${pkgs.coreutils}/bin/cat ${versionManifest}
       '';
     };
 

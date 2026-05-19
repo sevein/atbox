@@ -136,6 +136,16 @@ jobs:
             target: worker-runtime
             platform: linux/arm64
             runner: ubuntu-24.04-arm
+          - role: worker-toolchain
+            image: ghcr.io/sevein/atbox-worker-toolchain
+            target: worker-toolchain-runtime
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - role: worker-toolchain
+            image: ghcr.io/sevein/atbox-worker-toolchain
+            target: worker-toolchain-runtime
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -204,6 +214,8 @@ jobs:
             image: ghcr.io/sevein/atbox-cli
           - role: worker
             image: ghcr.io/sevein/atbox-worker
+          - role: worker-toolchain
+            image: ghcr.io/sevein/atbox-worker-toolchain
     permissions:
       contents: read
       packages: write
@@ -323,6 +335,7 @@ jobs:
           - ${GHCR_NAMESPACE}/atbox-admin:${IMAGE_TAG}
           - ${GHCR_NAMESPACE}/atbox-cli:${IMAGE_TAG}
           - ${GHCR_NAMESPACE}/atbox-worker:${IMAGE_TAG}
+          - ${GHCR_NAMESPACE}/atbox-worker-toolchain:${IMAGE_TAG}
           workflow-run: ${RUN_URL}
           EOF
           )"

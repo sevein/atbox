@@ -187,6 +187,14 @@ services:
       - uploads-data:/atom/src/web/uploads
       - downloads-data:/atom/src/web/downloads
 
+  atbox_worker_toolchain:
+    image: atbox-worker-toolchain:integration
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: worker-toolchain-runtime
+
 volumes:
   mysql-data:
   uploads-data:

@@ -11,6 +11,7 @@ ATBOX_REPLICA_SERVICE="${ATBOX_REPLICA_SERVICE:-atbox_replica}"
 ATBOX_ADMIN_SERVICE="${ATBOX_ADMIN_SERVICE:-atbox_admin}"
 ATBOX_CLI_SERVICE="${ATBOX_CLI_SERVICE:-atbox_cli}"
 ATBOX_WORKER_SERVICE="${ATBOX_WORKER_SERVICE:-atbox_worker}"
+ATBOX_WORKER_TOOLCHAIN_SERVICE="${ATBOX_WORKER_TOOLCHAIN_SERVICE:-atbox_worker_toolchain}"
 ATOM_NAMESPACE="${ATOM_NAMESPACE:-atbox-it}"
 ADMIN_ATOM_SESSION_NAME="${ADMIN_ATOM_SESSION_NAME:-atbox-admin-it}"
 ATBOX_REST_API_KEY="${ATBOX_REST_API_KEY:-atbox-rest-api-key}"
@@ -38,6 +39,7 @@ export ATBOX_REPLICA_SERVICE
 export ATBOX_ADMIN_SERVICE
 export ATBOX_CLI_SERVICE
 export ATBOX_WORKER_SERVICE
+export ATBOX_WORKER_TOOLCHAIN_SERVICE
 export ATOM_NAMESPACE
 export ADMIN_ATOM_SESSION_NAME
 export ATBOX_REST_API_KEY
@@ -574,6 +576,63 @@ esac
 ' sh "${expected_commands}" "${absent_commands}" "${expected_report_tools}" "${absent_report_tools}"
 
   echo "Toolchain command assertions passed for ${service}"
+}
+
+assert_worker_toolchain_image() {
+  local service="${ATBOX_WORKER_TOOLCHAIN_SERVICE}"
+  local expected_commands="ffmpeg ffprobe convert identify mogrify composite magick gs ps2pdf pdfinfo pdftotext java fop unzip version-report"
+  local expected_report=$'ffmpeg 6.1.1\nfop 2.8\nghostscript 10.03.1\nimagemagick 7.1.1-34\njava 17.0.10\npoppler-utils 24.02.0\nunzip 6.0'
+  local command_name report sorted_report sorted_expected status output image_id container_id path
+
+  report="$(compose run --rm "${service}" | tr -d '\r')"
+  sorted_report="$(printf "%s\n" "${report}" | sort)"
+  sorted_expected="$(printf "%s\n" "${expected_report}" | sort)"
+  if [[ "${sorted_report}" != "${sorted_expected}" ]]; then
+    echo "Unexpected worker toolchain version-report output."
+    echo "Expected:"
+    printf "%s\n" "${sorted_expected}"
+    echo "Got:"
+    printf "%s\n" "${sorted_report}"
+    return 1
+  fi
+
+  for command_name in ${expected_commands}; do
+    set +e
+    output="$(compose run --rm "${service}" "${command_name}" --version 2>&1)"
+    status=$?
+    set -e
+
+    if [[ ${status} -eq 127 ]] || printf "%s\n" "${output}" | grep -qiE "executable file not found|command not found"; then
+      echo "Expected worker toolchain command is missing from PATH: ${command_name}"
+      printf "%s\n" "${output}"
+      return 1
+    fi
+  done
+
+  image_id="$(compose images -q "${service}" | head -n 1)"
+  if [[ -z "${image_id}" ]]; then
+    echo "Could not resolve image id for ${service}"
+    return 1
+  fi
+
+  container_id="$(docker create "${image_id}")"
+  trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true; trap - RETURN' RETURN
+
+  for path in /nix /usr/local/bin; do
+    if ! docker cp "${container_id}:${path}" - >/dev/null 2>&1; then
+      echo "Expected worker toolchain image path is missing: ${path}"
+      return 1
+    fi
+  done
+
+  for path in /atom /etc/atbox /etc/s6-overlay /usr/bin/php /usr/sbin/nginx /usr/local/bin/atbox-worker-entrypoint; do
+    if docker cp "${container_id}:${path}" - >/dev/null 2>&1; then
+      echo "Unexpected runtime path is present in worker toolchain image: ${path}"
+      return 1
+    fi
+  done
+
+  echo "Worker toolchain image assertions passed for ${service}"
 }
 
 assert_generated_runtime_config() {

@@ -10,6 +10,7 @@ AtoM source and dependency layers.
 - `ghcr.io/sevein/atbox-admin`: authenticated metadata-editing web runtime.
 - `ghcr.io/sevein/atbox-cli`: lifecycle/CLI runtime for one-shot jobs.
 - `ghcr.io/sevein/atbox-worker`: long-running AtoM Gearman worker runtime.
+- `ghcr.io/sevein/atbox-worker-toolchain`: worker command-line toolchain only.
 
 The chart in `charts/atbox` provides presets for read-only, admin-only, and
 public-plus-admin topologies where MySQL, Elasticsearch, Memcached, and
@@ -107,6 +108,20 @@ The aggregate packages are:
 Docker builds use these role-specific Nix aggregates as the source for AtoM
 external command tools in the admin, CLI, and worker images. The public
 read-only image does not include the AtoM toolchain.
+
+The worker toolchain is also published as
+`ghcr.io/sevein/atbox-worker-toolchain:<tag>` for downstream Docker builds that
+need the same pinned tools without the full AtoM worker runtime. This image
+contains only the Nix-built `.#atbox-worker-toolchain` closure and
+`/usr/local/bin` shims. It does not include AtoM source, PHP, Gearman, nginx,
+`s6-overlay`, entrypoints, or role rootfs files.
+
+Downstream Dockerfiles can consume the toolchain as a build source:
+
+```Dockerfile
+COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /nix /nix
+COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /usr/local/bin /usr/local/bin
+```
 
 Useful Nix commands on Linux, or on another host with a Linux builder:
 

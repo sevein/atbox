@@ -10,10 +10,13 @@ This repository builds and tests a small AtoM container image family:
   `ghcr.io/sevein/atbox-cli`.
 - `worker-runtime`: long-running AtoM Gearman worker image, published as
   `ghcr.io/sevein/atbox-worker`.
+- `worker-toolchain-runtime`: worker command-line toolchain only, published as
+  `ghcr.io/sevein/atbox-worker-toolchain`.
 
-Keep changes scoped to those roles. The readonly image should remain safe for
-public browsing, while admin, CLI, and worker behavior should stay isolated in
-their own targets.
+Keep changes scoped to those targets. The readonly image should remain safe for
+public browsing. Admin, CLI, and worker behavior should stay isolated in their
+own runtime targets, and the worker toolchain image should remain distinct from
+the full worker runtime.
 
 ## Requirements
 
@@ -63,6 +66,7 @@ docker buildx build --target readonly-runtime -t atbox-public:dev --load .
 docker buildx build --target admin-runtime -t atbox-admin:dev --load .
 docker buildx build --target cli-runtime -t atbox-cli:dev --load .
 docker buildx build --target worker-runtime -t atbox-worker:dev --load .
+docker buildx build --target worker-toolchain-runtime -t atbox-worker-toolchain:dev --load .
 ```
 
 Build for a specific platform when checking multi-architecture behavior:
@@ -79,6 +83,7 @@ docker buildx build --target readonly-runtime --check .
 docker buildx build --target admin-runtime --check .
 docker buildx build --target cli-runtime --check .
 docker buildx build --target worker-runtime --check .
+docker buildx build --target worker-toolchain-runtime --check .
 ```
 
 ## Local runtime checks
@@ -114,6 +119,20 @@ docker run --rm \
   -e ATOM_MYSQL_USERNAME=atom \
   -e ATOM_MYSQL_PASSWORD='replace-me' \
   atbox-cli:dev php -r 'echo "cli ok\n";'
+```
+
+Check the worker toolchain-only image reports the pinned tool versions:
+
+```bash
+docker run --rm atbox-worker-toolchain:dev
+```
+
+Downstream Dockerfiles can copy only the Nix closure and shims from the
+published toolchain image:
+
+```Dockerfile
+COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /nix /nix
+COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /usr/local/bin /usr/local/bin
 ```
 
 ## Integration tests
@@ -223,7 +242,7 @@ Release workflow inputs:
 | `image_tag` | Always | Images and chart | Container tag for all role images and chart `appVersion`. |
 | `atom_version` | Images only | `release_images=true` | AtoM source tag downloaded into the image build. |
 | `chart_version` | Chart only | `release_chart=true` | Helm chart package version. |
-| `release_images` | Always | Artifact selection | Publishes the four role images when `true`. |
+| `release_images` | Always | Artifact selection | Publishes the runtime and toolchain images when `true`. |
 | `release_chart` | Always | Artifact selection | Publishes the Helm OCI chart when `true`. |
 
 Trigger images and chart together:
@@ -264,6 +283,7 @@ manifests for:
 - `ghcr.io/sevein/atbox-admin:<image_tag>`
 - `ghcr.io/sevein/atbox-cli:<image_tag>`
 - `ghcr.io/sevein/atbox-worker:<image_tag>`
+- `ghcr.io/sevein/atbox-worker-toolchain:<image_tag>`
 
 It also creates an annotated git tag named `images/<image_tag>`, for example
 `images/2.10.1-dev1`.

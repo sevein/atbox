@@ -133,6 +133,11 @@ RUN set -eux; \
     cp -a --parents $(nix-store --query --requisites /tmp/result) /tmp/closure; \
     cp -a /tmp/result/bin/. /tmp/closure/usr/local/bin/
 
+FROM scratch AS worker-toolchain-runtime
+ENV PATH=/usr/local/bin
+COPY --from=worker-toolchain /tmp/closure/ /
+CMD ["version-report"]
+
 FROM runtime-base AS job-runtime-base
 ARG PHP_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
