@@ -582,7 +582,9 @@ assert_worker_toolchain_image() {
   local service="${ATBOX_WORKER_TOOLCHAIN_SERVICE}"
   local expected_commands="ffmpeg ffprobe convert identify mogrify composite magick gs ps2pdf pdfinfo pdftotext java fop unzip version-report"
   local expected_report=$'ffmpeg 6.1.1\nfop 2.8\nghostscript 10.03.1\nimagemagick 7.1.1-34\njava 17.0.10\npoppler-utils 24.02.0\nunzip 6.0'
-  local command_name report sorted_report sorted_expected status output image_id container_id path
+  local command_name report sorted_report sorted_expected status output image_ref image_id container_id path
+
+  compose build --quiet "${service}" >/dev/null
 
   report="$(compose run --rm "${service}" | tr -d '\r')"
   sorted_report="$(printf "%s\n" "${report}" | sort)"
@@ -610,6 +612,10 @@ assert_worker_toolchain_image() {
   done
 
   image_id="$(compose images -q "${service}" | head -n 1)"
+  if [[ -z "${image_id}" ]]; then
+    image_ref="$(compose config "${service}" | awk '$1 == "image:" { print $2; exit }')"
+    image_id="$(docker image inspect "${image_ref}" --format '{{.Id}}' 2>/dev/null || true)"
+  fi
   if [[ -z "${image_id}" ]]; then
     echo "Could not resolve image id for ${service}"
     return 1
@@ -655,6 +661,8 @@ grep -q "arFindingAidJob" /atom/src/config/gearman.yml
 grep -q "worker_types:" /atom/src/apps/qubit/config/gearman.yml
 grep -q "arFindingAidJob" /atom/src/apps/qubit/config/gearman.yml
 grep -q "workers_key:" /atom/src/apps/qubit/config/app.yml
+grep -q "no_script_name: *true" /atom/src/apps/qubit/config/settings.yml
+! grep -q "no_script_name: *false" /atom/src/apps/qubit/config/settings.yml
 grep -q "session_name: ${expected_session_name}" /atom/src/apps/qubit/config/factories.yml
 grep -q "session_cookie_secure: ${expected_session_secure}" /atom/src/apps/qubit/config/factories.yml
 grep -q "file_uploads = Off" /etc/php/8.3/mods-available/atbox.ini
@@ -672,7 +680,7 @@ assert_admin_oidc_bootstrap_config() {
     -e ATOM_OIDC_PROVIDER_URL=https://keycloak.example.org/realms/atom \
     -e ATOM_OIDC_CLIENT_ID=atom-admin \
     -e ATOM_OIDC_CLIENT_SECRET=secret \
-    -e ATOM_OIDC_REDIRECT_URL=https://atom.example.org/index.php/oidc/login \
+    -e ATOM_OIDC_REDIRECT_URL=https://atom.example.org/oidc/login \
     -e ATOM_OIDC_LOGOUT_REDIRECT_URL=https://atom.example.org \
     "${ATBOX_ADMIN_SERVICE}" \
     -lc '
@@ -749,6 +757,24 @@ assert_admin_blocks_dangerous_methods() {
   done
 
   echo "Admin dangerous method assertions passed"
+}
+
+assert_clean_urls() {
+  local status
+
+  status="$(curl -sS -o /dev/null -w '%{http_code}' "${ATBOX_URL%/}/informationobject/browse" || true)"
+  if [[ ! "${status}" =~ ^[23][0-9][0-9]$ ]]; then
+    echo "Expected public clean URL to work, got HTTP ${status}"
+    return 1
+  fi
+
+  status="$(curl -sS -o /dev/null -w '%{http_code}' "${ATBOX_ADMIN_URL%/}/user/login" || true)"
+  if [[ ! "${status}" =~ ^[23][0-9][0-9]$ ]]; then
+    echo "Expected admin clean URL to work, got HTTP ${status}"
+    return 1
+  fi
+
+  echo "Clean URL assertions passed"
 }
 
 assert_php_direct_access_blocked() {

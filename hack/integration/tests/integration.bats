@@ -40,6 +40,7 @@ bats::on_failure() {
   wait_for_http_ok "${ATBOX_REPLICA_URL}" 240
   wait_for_http_ok "${ATBOX_ADMIN_URL}" 240
   wait_for_healthy "${ATBOX_WORKER_SERVICE}" 240
+  assert_clean_urls
 }
 
 @test "generated runtime config matches each role" {

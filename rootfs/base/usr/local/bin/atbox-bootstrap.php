@@ -265,6 +265,24 @@ function configureLoginModule(string $module): void
     writeFile($path, $updated);
 }
 
+function configureNoScriptName(): void
+{
+    $path = ATOM_DIR.'/apps/qubit/config/settings.yml';
+    if (!is_readable($path)) {
+        fwrite(STDERR, "AtoM settings file not found at {$path}\n");
+        exit(1);
+    }
+
+    $settings = file_get_contents($path);
+    $updated = preg_replace('/(^\s*no_script_name:\s*)\S+/m', '${1}true', $settings, -1, $count);
+    if ($count < 1 || null === $updated) {
+        fwrite(STDERR, "Unable to configure AtoM no_script_name in {$path}\n");
+        exit(1);
+    }
+
+    writeFile($path, $updated);
+}
+
 function configureProjectPlugin(string $plugin, bool $enabled): void
 {
     $path = ATOM_DIR.'/config/ProjectConfiguration.class.php';
@@ -381,6 +399,7 @@ if ($oidcEnabled && 'admin' !== $role) {
 if (!file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml') && file_exists(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl')) {
     copy(ATOM_DIR.'/apps/qubit/config/settings.yml.tmpl', ATOM_DIR.'/apps/qubit/config/settings.yml');
 }
+configureNoScriptName();
 
 if (!file_exists(ATOM_DIR.'/config/appChallenge.yml') && file_exists(ATOM_DIR.'/config/appChallenge.yml.tmpl')) {
     copy(ATOM_DIR.'/config/appChallenge.yml.tmpl', ATOM_DIR.'/config/appChallenge.yml');
