@@ -228,7 +228,7 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 | `ATOM_OIDC_PROVIDER_URL`       | Admin OIDC | none             | OIDC issuer/provider URL, for example a Keycloak realm URL.                                     |
 | `ATOM_OIDC_CLIENT_ID`          | Admin OIDC | none             | Confidential OIDC client ID used by the AtoM admin web runtime.                                 |
 | `ATOM_OIDC_CLIENT_SECRET`      | Admin OIDC | none             | Confidential OIDC client secret. Use a Kubernetes Secret in Helm deployments.                   |
-| `ATOM_OIDC_REDIRECT_URL`       | Admin OIDC | none             | Public AtoM callback URL, ending in `/index.php/oidc/login`.                                    |
+| `ATOM_OIDC_REDIRECT_URL`       | Admin OIDC | none             | Public AtoM callback URL, ending in `/oidc/login`.                                              |
 | `ATOM_OIDC_LOGOUT_REDIRECT_URL` | Admin OIDC | none            | Public URL where the identity provider redirects after logout.                                  |
 | `ATOM_OIDC_SEND_LOGOUT`        | Admin OIDC | `true`           | Sends OIDC logout requests when the provider supports end-session.                              |
 | `ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE` | Admin OIDC | `true`    | Allows AtoM to use refresh tokens when the provider issues them.                                |
@@ -280,7 +280,7 @@ atom:
       clientSecret:
         existingSecret: atom-admin-oidc
         key: client-secret
-      redirectUrl: https://atom.example.org/index.php/oidc/login
+      redirectUrl: https://atom.example.org/oidc/login
       logoutRedirectUrl: https://atom.example.org
 ```
 

@@ -83,7 +83,7 @@ tests:
       atom.admin.oidc.enabled: true
       atom.admin.oidc.providerUrl: https://keycloak.example.org/realms/atom
       atom.admin.oidc.clientId: atom-admin
-      atom.admin.oidc.redirectUrl: https://atom.example.org/index.php/oidc/login
+      atom.admin.oidc.redirectUrl: https://atom.example.org/oidc/login
       atom.admin.oidc.logoutRedirectUrl: https://atom.example.org
     asserts:
       - failedTemplate:
@@ -97,7 +97,7 @@ tests:
       atom.admin.oidc.clientId: atom-admin
       atom.admin.oidc.clientSecret.existingSecret: atom-admin-oidc
       atom.admin.oidc.clientSecret.key: client-secret
-      atom.admin.oidc.redirectUrl: https://atom.example.org/index.php/oidc/login
+      atom.admin.oidc.redirectUrl: https://atom.example.org/oidc/login
       atom.admin.oidc.logoutRedirectUrl: https://atom.example.org
       atom.admin.oidc.userMatchingSource: oidc-username
     asserts:

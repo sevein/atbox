@@ -78,7 +78,7 @@ const browser = await chromium.launch({ headless: true });
 
 try {
   const page = await browser.newPage();
-  const loginResponse = await page.goto(absoluteUrl('/index.php/user/login'), {
+  const loginResponse = await page.goto(absoluteUrl('/user/login'), {
     timeout: timeoutMs,
     waitUntil: 'domcontentloaded',
   });
@@ -88,9 +88,15 @@ try {
     throw new Error(`Admin login page request failed (${status})`);
   }
 
-  const loginForm = page.locator('main form, #main-column form').filter({
+  let loginForm = page.locator('#main-column form').filter({
     has: page.locator('input[name="password"], input[type="password"]'),
   }).first();
+
+  if (!(await loginForm.count())) {
+    loginForm = page.locator('main form').filter({
+      has: page.locator('input[name="password"], input[type="password"]'),
+    }).first();
+  }
 
   if (!(await loginForm.count())) {
     throw new Error('Unable to find admin login form');
@@ -105,6 +111,12 @@ try {
     'input[type="text"]',
   ], username);
   const filledPassword = await fillFirst(loginForm, ['input[name="password"]', 'input[type="password"]'], password);
+  const nextInput = loginForm.locator('input[name="next"]').first();
+  if (await nextInput.count()) {
+    await nextInput.evaluate((input, value) => {
+      input.value = value;
+    }, absoluteUrl('/'));
+  }
 
   if (!filledUser || !filledPassword) {
     throw new Error('Unable to find admin login fields');
@@ -112,15 +124,15 @@ try {
 
   await clickFirstAndWait(page, loginForm, ['button[type="submit"]', 'input[type="submit"]']);
 
-  const loggedInHtml = await page.content();
-  if (!/logout|log out|my profile|admin/i.test(loggedInHtml) || /invalid|incorrect|required/i.test(loggedInHtml)) {
+  const passwordField = page.locator('input[name="password"], input[type="password"]').filter({ visible: true }).first();
+  if (await passwordField.count()) {
     throw new Error('Admin login did not appear to succeed');
   }
 
   const title = `atbox admin smoke ${Date.now()}`;
   const updatedTitle = `${title} updated`;
   const identifier = `atbox-${Date.now()}`;
-  const addResponse = await page.goto(absoluteUrl('/index.php/informationobject/add'), {
+  const addResponse = await page.goto(absoluteUrl('/informationobject/add'), {
     timeout: timeoutMs,
     waitUntil: 'domcontentloaded',
   });
@@ -177,7 +189,7 @@ try {
     throw new Error('Unable to submit information object add form');
   }
 
-  await page.goto(absoluteUrl(`/index.php/informationobject/browse?topLod=0&query=${encodeURIComponent(title)}`), {
+  await page.goto(absoluteUrl(`/informationobject/browse?topLod=0&query=${encodeURIComponent(title)}`), {
     timeout: timeoutMs,
     waitUntil: 'domcontentloaded',
   });
@@ -235,7 +247,7 @@ try {
     throw new Error('Unable to submit information object edit form');
   }
 
-  await page.goto(absoluteUrl(`/index.php/informationobject/browse?topLod=0&query=${encodeURIComponent(updatedTitle)}`), {
+  await page.goto(absoluteUrl(`/informationobject/browse?topLod=0&query=${encodeURIComponent(updatedTitle)}`), {
     timeout: timeoutMs,
     waitUntil: 'domcontentloaded',
   });
