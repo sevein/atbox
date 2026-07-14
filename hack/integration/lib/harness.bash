@@ -777,6 +777,34 @@ assert_clean_urls() {
   echo "Clean URL assertions passed"
 }
 
+assert_shared_media_storage() {
+  local upload_body download_body service_url body
+
+  upload_body="atbox shared uploads smoke"
+  download_body="atbox shared downloads smoke"
+
+  compose exec -T --user atbox "${ATBOX_ADMIN_SERVICE}" sh -ec \
+    'printf "%s\n" "atbox shared uploads smoke" > /atom/src/uploads/atbox-storage-smoke.txt'
+  compose exec -T --user atbox "${ATBOX_WORKER_SERVICE}" sh -ec \
+    'printf "%s\n" "atbox shared downloads smoke" > /atom/src/downloads/atbox-storage-smoke.txt'
+
+  for service_url in "${ATBOX_URL}" "${ATBOX_REPLICA_URL}"; do
+    body="$(curl -fsS "${service_url%/}/uploads/atbox-storage-smoke.txt")"
+    if [[ "${body}" != "${upload_body}" ]]; then
+      echo "Shared upload was not served by ${service_url}"
+      return 1
+    fi
+
+    body="$(curl -fsS "${service_url%/}/downloads/atbox-storage-smoke.txt")"
+    if [[ "${body}" != "${download_body}" ]]; then
+      echo "Shared download was not served by ${service_url}"
+      return 1
+    fi
+  done
+
+  echo "Shared media storage assertions passed"
+}
+
 assert_php_direct_access_blocked() {
   local service_url="${1:?service URL required}"
   local label="${2:?label required}"

@@ -249,8 +249,8 @@ COPY rootfs/worker/ /
 WORKDIR /atom/src
 
 RUN set -eux; \
-    mkdir -p /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log /atom/src/web/uploads/tmp /atom/src/web/downloads; \
-    chown -R atbox:atbox /tmp/atom /atom/src/cache /atom/src/log /atom/src/web/uploads /atom/src/web/downloads; \
+    mkdir -p /tmp/atom/cache/app /tmp/atom/sessions /tmp/atom/log /atom/src/cache /atom/src/log /atom/src/uploads/tmp /atom/src/downloads; \
+    chown -R atbox:atbox /tmp/atom /atom/src/cache /atom/src/log /atom/src/uploads /atom/src/downloads; \
     chmod +x /usr/local/bin/atbox-bootstrap.php /usr/local/bin/atbox-worker-entrypoint
 
 STOPSIGNAL SIGTERM

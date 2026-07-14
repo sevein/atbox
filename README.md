@@ -160,11 +160,13 @@ those workflows in a separate authenticated writer/admin tier.
 
 In multi-instance deployments, `uploads/` should use shared durable storage (for
 example NFS), and `downloads/` should be shared only if generated artifacts must
-be available from every instance. Public read-only instances should mount these
-paths as read-only, while the writer/admin tier should be the only one with
-read-write mounts. Native object-storage semantics are not first-class in this
-image yet, so object storage currently requires an external integration layer;
-upstream support remains a future direction.
+be available from every instance. The container paths are `/atom/src/uploads`
+and `/atom/src/downloads`, matching AtoM's `/atom/src` web root. Public
+read-only instances should mount these paths as read-only, while the
+writer/admin tier and workers use read-write mounts. Native object-storage
+semantics are not first-class in this image yet, so object storage currently
+requires an external integration layer; upstream support remains a future
+direction.
 
 ## Operational profile
 

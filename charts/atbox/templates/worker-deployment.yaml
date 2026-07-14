@@ -39,9 +39,9 @@ spec:
           imagePullPolicy: {{ .Values.atom.worker.image.pullPolicy }}
           volumeMounts:
             - name: uploads
-              mountPath: /atom/src/web/uploads
+              mountPath: /atom/src/uploads
             - name: downloads
-              mountPath: /atom/src/web/downloads
+              mountPath: /atom/src/downloads
           env:
             {{- include "atbox.commonEnv" . | nindent 12 }}
             - name: ATOM_SESSION_NAME

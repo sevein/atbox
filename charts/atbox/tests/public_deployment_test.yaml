@@ -37,6 +37,30 @@ tests:
           path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
           value: NET_RAW
 
+  - it: mounts shared media storage read-only under the AtoM web root
+    set:
+      storage.uploads.existingClaim: atom-uploads
+      storage.downloads.existingClaim: atom-downloads
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0]
+          value:
+            name: uploads
+            mountPath: /atom/src/uploads
+            readOnly: true
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1]
+          value:
+            name: downloads
+            mountPath: /atom/src/downloads
+            readOnly: true
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: atom-uploads
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: atom-downloads
+
   - it: renders no public deployment when disabled
     set:
       atom.public.enabled: false

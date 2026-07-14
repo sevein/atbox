@@ -738,9 +738,9 @@ FPM
 @symlink(ATOM_DIR.'/vendor/symfony/data/web/sf', ATOM_DIR.'/sf');
 
 foreach ([
-    ATOM_DIR.'/web/uploads',
-    ATOM_DIR.'/web/uploads/tmp',
-    ATOM_DIR.'/web/downloads',
+    ATOM_DIR.'/uploads',
+    ATOM_DIR.'/uploads/tmp',
+    ATOM_DIR.'/downloads',
 ] as $runtimeDir) {
     if (!is_dir($runtimeDir)) {
         @mkdir($runtimeDir, 0775, true);

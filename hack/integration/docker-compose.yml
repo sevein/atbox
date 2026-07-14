@@ -85,16 +85,16 @@ services:
     ports:
       - "18080:8080"
     volumes:
-      - uploads-data:/atom/src/web/uploads:ro
-      - downloads-data:/atom/src/web/downloads:ro
+      - uploads-data:/atom/src/uploads:ro
+      - downloads-data:/atom/src/downloads:ro
 
   atbox_replica:
     <<: *atbox-common
     ports:
       - "18081:8080"
     volumes:
-      - uploads-data:/atom/src/web/uploads:ro
-      - downloads-data:/atom/src/web/downloads:ro
+      - uploads-data:/atom/src/uploads:ro
+      - downloads-data:/atom/src/downloads:ro
 
   atbox_admin:
     <<: *atbox-common
@@ -119,8 +119,8 @@ services:
     ports:
       - "18082:8080"
     volumes:
-      - uploads-data:/atom/src/web/uploads
-      - downloads-data:/atom/src/web/downloads
+      - uploads-data:/atom/src/uploads
+      - downloads-data:/atom/src/downloads
 
   atbox_cli:
     image: atbox-cli:integration
@@ -184,8 +184,8 @@ services:
     healthcheck:
       disable: true
     volumes:
-      - uploads-data:/atom/src/web/uploads
-      - downloads-data:/atom/src/web/downloads
+      - uploads-data:/atom/src/uploads
+      - downloads-data:/atom/src/downloads
 
   atbox_worker_toolchain:
     image: atbox-worker-toolchain:integration

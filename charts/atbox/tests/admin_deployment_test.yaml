@@ -72,10 +72,18 @@ tests:
           path: spec.template.spec.containers[0].volumeMounts[0]
           value:
             name: uploads
-            mountPath: /atom/src/web/uploads
+            mountPath: /atom/src/uploads
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1]
+          value:
+            name: downloads
+            mountPath: /atom/src/downloads
       - equal:
           path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
           value: atom-uploads
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: atom-downloads
 
   - it: fails when admin OIDC is enabled without a client secret reference
     set:

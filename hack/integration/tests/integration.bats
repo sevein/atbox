@@ -43,6 +43,10 @@ bats::on_failure() {
   assert_clean_urls
 }
 
+@test "writer files are served by readonly replicas" {
+  assert_shared_media_storage
+}
+
 @test "generated runtime config matches each role" {
   assert_generated_runtime_config "${ATBOX_PRIMARY_SERVICE}" "true" "atbox-it" "true"
   assert_generated_runtime_config "${ATBOX_REPLICA_SERVICE}" "true" "atbox-it" "true"

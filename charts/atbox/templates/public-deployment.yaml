@@ -41,12 +41,12 @@ spec:
           volumeMounts:
             {{- if .Values.storage.uploads.existingClaim }}
             - name: uploads
-              mountPath: /atom/src/web/uploads
+              mountPath: /atom/src/uploads
               readOnly: true
             {{- end }}
             {{- if .Values.storage.downloads.existingClaim }}
             - name: downloads
-              mountPath: /atom/src/web/downloads
+              mountPath: /atom/src/downloads
               readOnly: true
             {{- end }}
           {{- end }}
