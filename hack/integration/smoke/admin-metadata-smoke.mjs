@@ -55,7 +55,7 @@ async function clickFirst(root, selectors) {
 
 async function clickFirstAndWait(page, root, selectors) {
   const clicked = await Promise.all([
-    page.waitForLoadState('domcontentloaded', { timeout: timeoutMs }).catch(() => {}),
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: timeoutMs }),
     clickFirst(root, selectors),
   ]);
 
@@ -115,7 +115,7 @@ try {
   if (await nextInput.count()) {
     await nextInput.evaluate((input, value) => {
       input.value = value;
-    }, absoluteUrl('/'));
+    }, '/');
   }
 
   if (!filledUser || !filledPassword) {
@@ -205,7 +205,7 @@ try {
   }
 
   await Promise.all([
-    page.waitForLoadState('domcontentloaded', { timeout: timeoutMs }).catch(() => {}),
+    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: timeoutMs }),
     resultLink.click(),
   ]);
 

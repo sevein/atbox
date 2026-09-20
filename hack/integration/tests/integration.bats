@@ -31,6 +31,46 @@ bats::on_failure() {
   assert_toolchain_commands "${ATBOX_WORKER_SERVICE}" "${media_commands} java fop unzip version-report" "" "${media_tools} java fop unzip" "which"
 }
 
+@test "PHP roles render images and writer roles rasterize PDFs" {
+  for service in "${ATBOX_PRIMARY_SERVICE}" "${ATBOX_ADMIN_SERVICE}" "${ATBOX_CLI_SERVICE}" "${ATBOX_WORKER_SERVICE}"; do
+    compose run --rm --no-deps --entrypoint php "${service}" -r '
+      $image = new Imagick();
+      $image->newImage(8, 8, "white", "png");
+      $image->thumbnailImage(4, 4);
+      if ($image->getImageWidth() !== 4 || strlen($image->getImageBlob()) === 0) { exit(1); }
+      if (trim(file_get_contents("/atom/src/.atbox-source-ref")) === "") { exit(1); }
+    '
+  done
+  for service in "${ATBOX_ADMIN_SERVICE}" "${ATBOX_CLI_SERVICE}" "${ATBOX_WORKER_SERVICE}"; do
+    compose run --rm --no-deps -T --entrypoint sh "${service}" -ec '
+      printf "%%!PS\n/Helvetica findfont 12 scalefont setfont 10 10 moveto (atbox) show showpage\n" | ps2pdf - /tmp/imagick.pdf
+      php /dev/stdin
+    ' <<'PHP'
+<?php
+require '/atom/src/plugins/sfThumbnailPlugin/lib/sfThumbnail.class.php';
+require '/atom/src/plugins/sfThumbnailPlugin/lib/sfImagickAdapter.class.php';
+
+// AtoM clamps an out-of-range PDF page to the last available page.
+$thumbnail = new sfThumbnail(100, 100, true, false, 75, 'sfImagickAdapter', ['extract' => 99]);
+$thumbnail->loadFile('/tmp/imagick.pdf');
+$image = new Imagick();
+$image->readImageBlob($thumbnail->toString('image/jpeg'));
+if ($image->getImageWidth() > 100 || $image->getImageHeight() > 100) { exit(1); }
+
+// Multi-page raster input must produce one thumbnail from the first frame.
+$frames = new Imagick();
+$frames->newImage(8, 8, 'red', 'tiff');
+$frames->newImage(16, 16, 'blue', 'tiff');
+$frames->writeImages('/tmp/imagick.tiff', true);
+$thumbnail = new sfThumbnail(100, 100, true, false, 75, 'sfImagickAdapter');
+$thumbnail->loadFile('/tmp/imagick.tiff');
+$image = new Imagick();
+$image->readImageBlob($thumbnail->toString('image/jpeg'));
+if ($image->getNumberImages() !== 1 || $image->getImageWidth() !== 8) { exit(1); }
+PHP
+  done
+}
+
 @test "worker toolchain image exposes only the Nix toolchain closure" {
   assert_worker_toolchain_image
 }
@@ -41,6 +81,20 @@ bats::on_failure() {
   wait_for_http_ok "${ATBOX_ADMIN_URL}" 240
   wait_for_healthy "${ATBOX_WORKER_SERVICE}" 240
   assert_clean_urls
+}
+
+@test "admin redirects preserve the effective request authority" {
+  local target="${ATBOX_ADMIN_URL%/}/user/logout"
+  local expected="${ATBOX_ADMIN_URL%/}/"
+
+  run curl -fsS -o /dev/null -w '%{redirect_url}' "${target}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
+
+  run curl -fsS -o /dev/null -w '%{redirect_url}' \
+    --request-target "${target}" -H 'Host: conflicting.invalid:6666' "${target}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$expected" ]
 }
 
 @test "writer files are served by readonly replicas" {

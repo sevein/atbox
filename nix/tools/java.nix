@@ -4,6 +4,6 @@ in
 mkTool {
   name = "java";
   binary = "java";
-  expectedVersion = "17.0.10";
+  expectedVersion = "17.0.11+9";
   package = pkgs: pkgs.jdk17_headless;
 }

@@ -23,7 +23,7 @@ package = "imagemagick"
 groups = ["atbox", "admin", "cli", "worker"]
 
 [tools.java]
-version = "17.0.10"
+version = "17.0.11+9"
 binaries = ["java"]
 package = "java"
 groups = ["atbox", "cli", "worker"]

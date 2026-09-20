@@ -13,8 +13,8 @@ AtoM source and dependency layers.
 - `ghcr.io/sevein/atbox-worker-toolchain`: worker command-line toolchain only.
 
 The chart in `charts/atbox` provides presets for read-only, admin-only, and
-public-plus-admin topologies where MySQL, Elasticsearch, Memcached, and
-Gearman are provided externally.
+public-plus-admin topologies where MySQL, Elasticsearch, Memcached, and Gearman
+are provided externally.
 
 ## What this project is for
 
@@ -70,15 +70,15 @@ shared writable `uploads/` storage and an accompanying worker tier.
 and runs `php -d memory_limit=-1 -d error_reporting=E_ALL symfony jobs:worker`
 as the non-root `atbox` user. The image includes the media and document tooling
 used by AtoM jobs through the Nix-defined worker toolchain, including
-ImageMagick, Ghostscript, Poppler, FFmpeg, Java, Apache FOP, and Unzip.
-Worker abilities are the upstream AtoM defaults from generated `gearman.yml`.
+ImageMagick, Ghostscript, Poppler, FFmpeg, Java, Apache FOP, and Unzip. Worker
+abilities are the upstream AtoM defaults from generated `gearman.yml`.
 
 ### AtoM toolchain
 
-The repository includes a Nix flake that defines the external command-line
-tools AtoM expects from the runtime environment. The flake entrypoint remains
-at the repository root, while the tool manifest and Nix implementation live
-under `nix/`. This scope is intentionally limited to tools AtoM shells out to
+The repository includes a Nix flake that defines the external command-line tools
+AtoM expects from the runtime environment. The flake entrypoint remains at the
+repository root, while the tool manifest and Nix implementation live under
+`nix/`. This scope is intentionally limited to tools AtoM shells out to
 directly, plus Ghostscript as the ImageMagick delegate required for PDF
 derivatives. The covered paths are digital object derivatives, PDF text
 extraction, PDF finding aid generation, SWORD package extraction, and small
@@ -96,14 +96,14 @@ command probes:
 The aggregate packages are:
 
 - `.#atbox-toolchain`: all managed AtoM tools.
-- `.#atbox-admin-toolchain`: tools needed by admin web paths that can run in
-  the request, including digital object uploads, derivative generation, PDF text
+- `.#atbox-admin-toolchain`: tools needed by admin web paths that can run in the
+  request, including digital object uploads, derivative generation, PDF text
   extraction, and repository theme image cropping.
 - `.#atbox-cli-toolchain`: tools needed by AtoM CLI tasks that generate digital
   object derivatives, extract text, or generate finding aids.
-- `.#atbox-worker-toolchain`: tools needed by worker jobs, including finding
-  aid generation, queued imports, derivative generation, text extraction, and
-  SWORD package extraction.
+- `.#atbox-worker-toolchain`: tools needed by worker jobs, including finding aid
+  generation, queued imports, derivative generation, text extraction, and SWORD
+  package extraction.
 
 Docker builds use these role-specific Nix aggregates as the source for AtoM
 external command tools in the admin, CLI, and worker images. The public
@@ -132,11 +132,11 @@ nix run .#version-report
 nix develop
 ```
 
-The toolchain does not include service dependencies or language/runtime
-packages such as MySQL, Elasticsearch, Memcached, Gearman, PHP extensions,
-`nginx`, `s6-overlay`, or the Saxon and XML resolver jars bundled by AtoM.
-Those remain part of the application image, external services, or AtoM source
-tree as appropriate.
+The toolchain does not include service dependencies or language/runtime packages
+such as MySQL, Elasticsearch, Memcached, Gearman, PHP extensions, `nginx`,
+`s6-overlay`, or the Saxon and XML resolver jars bundled by AtoM. Those remain
+part of the application image, external services, or AtoM source tree as
+appropriate.
 
 ### Cache architecture decisions
 
@@ -177,8 +177,8 @@ direction.
 
 `atbox-cli` does not run `s6-overlay`; it bootstraps the same AtoM config and
 then executes the supplied command, for example `php symfony search:populate`.
-`atbox-worker` also does not run `s6-overlay`; it bootstraps config, drops to the
-runtime user, and execs the worker command.
+`atbox-worker` also does not run `s6-overlay`; it bootstraps config, drops to
+the runtime user, and execs the worker command.
 
 ## Scope and non-goals
 
@@ -212,44 +212,44 @@ For local development builds from this repository, see `CONTRIBUTING.md`.
 
 ## Configuration reference
 
-| Variable                       | Required   | Default          | Notes                                                                                           |
-| ------------------------------ | ---------- | ---------------- | ----------------------------------------------------------------------------------------------- |
-| `ATOM_ELASTICSEARCH_HOST`      | Yes        | none             | Elasticsearch endpoint (`host[:port]`).                                                         |
-| `ATOM_GEARMAN_HOST`            | No         | `127.0.0.1:4730` | Gearman endpoint (`host[:port]`). Required for job-backed admin/worker use.                      |
-| `ATOM_MEMCACHED_HOST`          | Yes        | none             | Memcached endpoint (`host[:port]`).                                                             |
-| `ATOM_MYSQL_DSN`               | Yes        | none             | PDO DSN for MySQL.                                                                              |
-| `ATOM_MYSQL_USERNAME`          | Yes        | none             | MySQL username.                                                                                 |
-| `ATOM_MYSQL_PASSWORD`          | Yes        | none             | MySQL password.                                                                                 |
-| `ATOM_NAMESPACE`               | No         | `atom`           | Convenience default used by cache/session namespace settings when they are not set directly.    |
-| `ATOM_CACHE_NAMESPACE`         | No         | `ATOM_NAMESPACE` | Memcached key prefix. Set per tenant/deployment to avoid cache collisions.                      |
-| `ATOM_WORKERS_KEY`             | No         | empty            | AtoM worker key. Must match across admin, CLI, and worker roles sharing a Gearman server.        |
-| `ATOM_SESSION_NAME`            | No         | `ATOM_NAMESPACE` | Session cookie name. Use a distinct value when public/admin tiers should not share login state. |
-| `ATOM_SESSION_COOKIE_SECURE`   | Admin only | `true`           | Set `false` only for local plain-HTTP admin testing.                                            |
-| `ATOM_SESSION_COOKIE_SAMESITE` | Admin only | `lax`            | One of `strict`, `lax`, or `none`.                                                              |
-| `ATOM_OIDC_ENABLED`            | Admin only | `false`          | Enables AtoM's `arOidcPlugin` and makes admin login use OIDC.                                   |
-| `ATOM_OIDC_PROVIDER_URL`       | Admin OIDC | none             | OIDC issuer/provider URL, for example a Keycloak realm URL.                                     |
-| `ATOM_OIDC_CLIENT_ID`          | Admin OIDC | none             | Confidential OIDC client ID used by the AtoM admin web runtime.                                 |
-| `ATOM_OIDC_CLIENT_SECRET`      | Admin OIDC | none             | Confidential OIDC client secret. Use a Kubernetes Secret in Helm deployments.                   |
-| `ATOM_OIDC_REDIRECT_URL`       | Admin OIDC | none             | Public AtoM callback URL, ending in `/oidc/login`.                                              |
-| `ATOM_OIDC_LOGOUT_REDIRECT_URL` | Admin OIDC | none            | Public URL where the identity provider redirects after logout.                                  |
-| `ATOM_OIDC_SEND_LOGOUT`        | Admin OIDC | `true`           | Sends OIDC logout requests when the provider supports end-session.                              |
-| `ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE` | Admin OIDC | `true`    | Allows AtoM to use refresh tokens when the provider issues them.                                |
-| `ATOM_OIDC_SERVER_CERT`        | Admin OIDC | `false`          | Certificate path for provider validation, or `false` for local/test deployments.                |
-| `ATOM_OIDC_SET_GROUPS_FROM_ATTRIBUTES` | Admin OIDC | `true` | Maps OIDC role claims into AtoM ACL group membership.                                           |
-| `ATOM_OIDC_SCOPES`             | Admin OIDC | `openid,profile,email` | Comma-separated OIDC scopes.                                                              |
-| `ATOM_OIDC_ROLES_SOURCE`       | Admin OIDC | `access-token`   | Token source for role claims.                                                                  |
-| `ATOM_OIDC_ROLES_PATH`         | Admin OIDC | `realm_access,roles` | Comma-separated path to role claims.                                                       |
-| `ATOM_OIDC_USER_MATCHING_SOURCE` | Admin OIDC | `oidc-email`    | One of `oidc-email` or `oidc-username`.                                                         |
-| `ATOM_OIDC_AUTO_CREATE_ATOM_USER` | Admin OIDC | `true`         | Creates missing AtoM users from trusted OIDC claims.                                            |
-| `ATOM_OIDC_USER_GROUPS_JSON`   | Admin OIDC | built-in AtoM group mappings | JSON role-to-group map for AtoM ACL groups.                                          |
-| `ATOM_UPLOADS_ENABLED`         | Admin only | `false`          | Enables PHP uploads and AtoM upload UI when shared writable storage is mounted.                  |
-| `ATOM_UPLOAD_LIMIT`            | Admin only | `-1`             | AtoM upload limit in gigabytes; `0` disables uploads, `-1` is unlimited.                         |
-| `ATOM_PHP_POST_MAX_SIZE`       | Admin only | `512M`           | PHP `post_max_size` when uploads are enabled.                                                    |
-| `ATOM_PHP_UPLOAD_MAX_FILESIZE` | Admin only | `512M`           | PHP `upload_max_filesize` when uploads are enabled.                                             |
-| `ATOM_PHP_MAX_FILE_UPLOADS`    | Admin only | `20`             | PHP `max_file_uploads` when uploads are enabled.                                                 |
-| `ATOM_WORKER_MEMORY_LIMIT`     | Worker     | `-1`             | PHP memory limit passed to the worker process.                                                   |
-| `ATOM_WORKER_MAX_JOB_COUNT`    | Worker     | empty            | Optional worker shutdown threshold after N completed jobs.                                      |
-| `ATOM_WORKER_MAX_MEM_USAGE`    | Worker     | empty            | Optional worker shutdown threshold in kB RSS.                                                    |
+| Variable                               | Required   | Default                      | Notes                                                                                           |
+| -------------------------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `ATOM_ELASTICSEARCH_HOST`              | Yes        | none                         | Elasticsearch endpoint (`host[:port]`).                                                         |
+| `ATOM_GEARMAN_HOST`                    | No         | `127.0.0.1:4730`             | Gearman endpoint (`host[:port]`). Required for job-backed admin/worker use.                     |
+| `ATOM_MEMCACHED_HOST`                  | Yes        | none                         | Memcached endpoint (`host[:port]`).                                                             |
+| `ATOM_MYSQL_DSN`                       | Yes        | none                         | PDO DSN for MySQL.                                                                              |
+| `ATOM_MYSQL_USERNAME`                  | Yes        | none                         | MySQL username.                                                                                 |
+| `ATOM_MYSQL_PASSWORD`                  | Yes        | none                         | MySQL password.                                                                                 |
+| `ATOM_NAMESPACE`                       | No         | `atom`                       | Convenience default used by cache/session namespace settings when they are not set directly.    |
+| `ATOM_CACHE_NAMESPACE`                 | No         | `ATOM_NAMESPACE`             | Memcached key prefix. Set per tenant/deployment to avoid cache collisions.                      |
+| `ATOM_WORKERS_KEY`                     | No         | empty                        | AtoM worker key. Must match across admin, CLI, and worker roles sharing a Gearman server.       |
+| `ATOM_SESSION_NAME`                    | No         | `ATOM_NAMESPACE`             | Session cookie name. Use a distinct value when public/admin tiers should not share login state. |
+| `ATOM_SESSION_COOKIE_SECURE`           | Admin only | `true`                       | Set `false` only for local plain-HTTP admin testing.                                            |
+| `ATOM_SESSION_COOKIE_SAMESITE`         | Admin only | `lax`                        | One of `strict`, `lax`, or `none`.                                                              |
+| `ATOM_OIDC_ENABLED`                    | Admin only | `false`                      | Enables AtoM's `arOidcPlugin` and makes admin login use OIDC.                                   |
+| `ATOM_OIDC_PROVIDER_URL`               | Admin OIDC | none                         | OIDC issuer/provider URL, for example a Keycloak realm URL.                                     |
+| `ATOM_OIDC_CLIENT_ID`                  | Admin OIDC | none                         | Confidential OIDC client ID used by the AtoM admin web runtime.                                 |
+| `ATOM_OIDC_CLIENT_SECRET`              | Admin OIDC | none                         | Confidential OIDC client secret. Use a Kubernetes Secret in Helm deployments.                   |
+| `ATOM_OIDC_REDIRECT_URL`               | Admin OIDC | none                         | Public AtoM callback URL, ending in `/oidc/login`.                                              |
+| `ATOM_OIDC_LOGOUT_REDIRECT_URL`        | Admin OIDC | none                         | Public URL where the identity provider redirects after logout.                                  |
+| `ATOM_OIDC_SEND_LOGOUT`                | Admin OIDC | `true`                       | Sends OIDC logout requests when the provider supports end-session.                              |
+| `ATOM_OIDC_ENABLE_REFRESH_TOKEN_USE`   | Admin OIDC | `true`                       | Allows AtoM to use refresh tokens when the provider issues them.                                |
+| `ATOM_OIDC_SERVER_CERT`                | Admin OIDC | `false`                      | Certificate path for provider validation, or `false` for local/test deployments.                |
+| `ATOM_OIDC_SET_GROUPS_FROM_ATTRIBUTES` | Admin OIDC | `true`                       | Maps OIDC role claims into AtoM ACL group membership.                                           |
+| `ATOM_OIDC_SCOPES`                     | Admin OIDC | `openid,profile,email`       | Comma-separated OIDC scopes.                                                                    |
+| `ATOM_OIDC_ROLES_SOURCE`               | Admin OIDC | `access-token`               | Token source for role claims.                                                                   |
+| `ATOM_OIDC_ROLES_PATH`                 | Admin OIDC | `realm_access,roles`         | Comma-separated path to role claims.                                                            |
+| `ATOM_OIDC_USER_MATCHING_SOURCE`       | Admin OIDC | `oidc-email`                 | One of `oidc-email` or `oidc-username`.                                                         |
+| `ATOM_OIDC_AUTO_CREATE_ATOM_USER`      | Admin OIDC | `true`                       | Creates missing AtoM users from trusted OIDC claims.                                            |
+| `ATOM_OIDC_USER_GROUPS_JSON`           | Admin OIDC | built-in AtoM group mappings | JSON role-to-group map for AtoM ACL groups.                                                     |
+| `ATOM_UPLOADS_ENABLED`                 | Admin only | `false`                      | Enables PHP uploads and AtoM upload UI when shared writable storage is mounted.                 |
+| `ATOM_UPLOAD_LIMIT`                    | Admin only | `-1`                         | AtoM upload limit in gigabytes; `0` disables uploads, `-1` is unlimited.                        |
+| `ATOM_PHP_POST_MAX_SIZE`               | Admin only | `512M`                       | PHP `post_max_size` when uploads are enabled.                                                   |
+| `ATOM_PHP_UPLOAD_MAX_FILESIZE`         | Admin only | `512M`                       | PHP `upload_max_filesize` when uploads are enabled.                                             |
+| `ATOM_PHP_MAX_FILE_UPLOADS`            | Admin only | `20`                         | PHP `max_file_uploads` when uploads are enabled.                                                |
+| `ATOM_WORKER_MEMORY_LIMIT`             | Worker     | `-1`                         | PHP memory limit passed to the worker process.                                                  |
+| `ATOM_WORKER_MAX_JOB_COUNT`            | Worker     | empty                        | Optional worker shutdown threshold after N completed jobs.                                      |
+| `ATOM_WORKER_MAX_MEM_USAGE`            | Worker     | empty                        | Optional worker shutdown threshold in kB RSS.                                                   |
 
 ## Helm chart
 

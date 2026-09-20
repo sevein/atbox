@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG ATOM_VERSION=2.10.1
+ARG ATOM_REF=073d364bbcaba3516ea61ac32c419791e1b26ad5
 ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG PHP_VERSION=8.3
 
@@ -14,7 +14,7 @@ RUN set -eux; \
     curl -LfsS -o /tmp/s6-overlay-aarch64.tar.xz "${base_url}/s6-overlay-aarch64.tar.xz"
 
 FROM debian:bookworm-slim AS atom-source
-ARG ATOM_VERSION
+ARG ATOM_REF
 ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -23,11 +23,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends ca-certificates curl tar; \
     rm -rf /var/lib/apt/lists/*
 RUN set -eux; \
+    printf '%s\n' "${ATOM_REF}" | grep -Eq '^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$'; \
     mkdir -p /tmp/atom-src; \
-    curl -LfsS "https://github.com/artefactual/atom/archive/refs/tags/v${ATOM_VERSION}.tar.gz" \
+    curl -LfsS "https://github.com/artefactual/atom/archive/${ATOM_REF}.tar.gz" \
       | tar xz --strip-components=1 -C /tmp/atom-src; \
     mkdir -p /atom/src; \
-    cp -a /tmp/atom-src/. /atom/src
+    cp -a /tmp/atom-src/. /atom/src; \
+    printf '%s\n' "${ATOM_REF}" > /atom/src/.atbox-source-ref
 
 FROM node:20-bookworm AS frontend-builder
 WORKDIR /atom/src
@@ -61,6 +63,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       php${PHP_VERSION}-cli \
       php${PHP_VERSION}-curl \
       php${PHP_VERSION}-gd \
+      php${PHP_VERSION}-imagick \
+      libmagickcore-6.q16-6-extra \
       php${PHP_VERSION}-intl \
       php${PHP_VERSION}-mbstring \
       php${PHP_VERSION}-mysql \
@@ -70,6 +74,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       php${PHP_VERSION}-zip \
       php${PHP_VERSION}-xml \
       php${PHP_VERSION}-apcu; \
+    sed -i 's/rights="none" pattern="PDF"/rights="read" pattern="PDF"/' /etc/ImageMagick-6/policy.xml; \
+    sed -i '/^fastcgi_param[[:space:]]\+HTTP_HOST[[:space:]]/d' /etc/nginx/fastcgi_params; \
+    printf 'fastcgi_param HTTP_HOST $atbox_fastcgi_host;\n' >> /etc/nginx/fastcgi_params; \
     rm -f /tmp/debsuryorg-archive-keyring.deb; \
     rm -f /etc/php/${PHP_VERSION}/fpm/pool.d/www.conf; \
     ln -sf /usr/bin/php${PHP_VERSION} /usr/local/bin/php; \

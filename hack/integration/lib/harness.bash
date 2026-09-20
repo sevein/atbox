@@ -581,7 +581,7 @@ esac
 assert_worker_toolchain_image() {
   local service="${ATBOX_WORKER_TOOLCHAIN_SERVICE}"
   local expected_commands="ffmpeg ffprobe convert identify mogrify composite magick gs ps2pdf pdfinfo pdftotext java fop unzip version-report"
-  local expected_report=$'ffmpeg 6.1.1\nfop 2.8\nghostscript 10.03.1\nimagemagick 7.1.1-34\njava 17.0.10\npoppler-utils 24.02.0\nunzip 6.0'
+  local expected_report=$'ffmpeg 6.1.1\nfop 2.8\nghostscript 10.03.1\nimagemagick 7.1.1-34\njava 17.0.11+9\npoppler-utils 24.02.0\nunzip 6.0'
   local command_name report sorted_report sorted_expected status output image_ref image_id container_id path
 
   compose build --quiet "${service}" >/dev/null

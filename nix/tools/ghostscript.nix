@@ -14,6 +14,7 @@ mkTool {
     pkgs.symlinkJoin {
       name = "ghostscript-atbox";
       paths = [ ghostscript ];
+      passthru.version = ghostscript.version;
       nativeBuildInputs = [ pkgs.makeWrapper ];
       postBuild = ''
         rm "$out/bin/ps2pdf"

@@ -135,6 +135,33 @@ COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /nix /nix
 COPY --from=ghcr.io/sevein/atbox-worker-toolchain:<tag> /usr/local/bin /usr/local/bin
 ```
 
+## Updating AtoM and its toolchain
+
+Check the selected AtoM source's Dockerfile and PHP command invocations for
+required tools. Use explicit upstream versions as compatibility references;
+where upstream relies on distribution packages, choose maintained versions and
+verify behavior. Check PHP extensions and codecs separately from Nix tools.
+
+1. Update the runtime package pin in `nix/lib/nixpkgs-source.nix`. Updating
+   `flake.lock` alone does not change it.
+2. Run the version audit for AMD64 and ARM64:
+
+   ```bash
+   nix eval --impure --json --file hack/toolchain-report.nix
+   ```
+
+3. Synchronize `nix/tools.toml`, `nix/tools/*.nix`, and the toolchain assertion in
+   `hack/integration/lib/harness.bash` until every `versionsMatch` is true.
+   Wrappers must expose their underlying version through `passthru.version`.
+4. Build all image roles for both architectures and run the integration suite.
+   Test affected workflows, including thumbnails, PDF text extraction, media
+   conversion, and finding aids. Matching version metadata does not prove
+   runtime compatibility.
+
+Keep source and toolchain upgrades separate when practical, and preserve the
+role groups in `tools.toml` unless a role's dependencies have changed. Follow the
+release process below to publish matching images and chart metadata.
+
 ## Integration tests
 
 Run the full integration suite:
@@ -240,17 +267,22 @@ Release workflow inputs:
 | Input | Required | Used when | Notes |
 | ----- | -------- | --------- | ----- |
 | `image_tag` | Always | Images and chart | Container tag for all role images and chart `appVersion`. |
-| `atom_version` | Images only | `release_images=true` | AtoM source tag downloaded into the image build. |
+| `atom_ref` | Images only | `release_images=true` | AtoM version tag (including `v`) or full commit SHA downloaded into the build. |
 | `chart_version` | Chart only | `release_chart=true` | Helm chart package version. |
 | `release_images` | Always | Artifact selection | Publishes the runtime and toolchain images when `true`. |
 | `release_chart` | Always | Artifact selection | Publishes the Helm OCI chart when `true`. |
+
+The `atom_ref` input replaces `atom_version` and accepts either a full commit
+SHA (for `qa/2.x` snapshots) or a release tag including its `v` prefix, such as
+`v2.10.2`. Moving branch names are rejected. The Dockerfile's default pin does
+not replace the explicit source selection required when publishing images.
 
 Trigger images and chart together:
 
 ```bash
 gh workflow run release.yml \
-  -f image_tag=2.10.1-dev1 \
-  -f atom_version=2.10.1 \
+  -f image_tag=2.10.3-dev1 \
+  -f atom_ref=073d364bbcaba3516ea61ac32c419791e1b26ad5 \
   -f chart_version=0.1.0 \
   -f release_images=true \
   -f release_chart=true
@@ -260,8 +292,8 @@ Release only the container images:
 
 ```bash
 gh workflow run release.yml \
-  -f image_tag=2.10.1-dev1 \
-  -f atom_version=2.10.1 \
+  -f image_tag=2.10.3-dev1 \
+  -f atom_ref=073d364bbcaba3516ea61ac32c419791e1b26ad5 \
   -f release_images=true \
   -f release_chart=false
 ```
@@ -270,7 +302,7 @@ Release only the Helm chart:
 
 ```bash
 gh workflow run release.yml \
-  -f image_tag=2.10.1-dev1 \
+  -f image_tag=2.10.3-dev1 \
   -f chart_version=0.1.0 \
   -f release_images=false \
   -f release_chart=true
@@ -286,7 +318,7 @@ manifests for:
 - `ghcr.io/sevein/atbox-worker-toolchain:<image_tag>`
 
 It also creates an annotated git tag named `images/<image_tag>`, for example
-`images/2.10.1-dev1`.
+`images/2.10.3-dev1`.
 
 When `release_chart=true`, it packages `charts/atbox` with the supplied chart
 version and publishes it to GHCR as an OCI Helm artifact. The chart `appVersion`
@@ -303,7 +335,7 @@ Before triggering a release, make sure:
 - `./hack/integration/run.sh` passes.
 - Helm lint/template checks pass for all preset values files.
 - `image_tag` matches the intended AtoM/application image version.
-- `atom_version` is set when publishing images.
+- `atom_ref` is set when publishing images.
 - `images/<image_tag>` does not already exist when publishing images.
 - `chart_version` follows SemVer when publishing the chart.
 - `charts/atbox/<chart_version>` does not already exist when publishing the

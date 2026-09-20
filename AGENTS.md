@@ -48,7 +48,7 @@
 - Manual release workflow: `.github/workflows/release.yml`.
 - Select artifacts with `release_images` and `release_chart`.
 - `image_tag` is always required.
-- `atom_version` is required when `release_images=true`.
+- `atom_ref` is required when `release_images=true`.
 - `chart_version` is required when `release_chart=true`.
 - Published images: `ghcr.io/sevein/atbox-public`, `ghcr.io/sevein/atbox-admin`,
   `ghcr.io/sevein/atbox-cli`, `ghcr.io/sevein/atbox-worker`, and

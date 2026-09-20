@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Image tag for images and chart appVersion (e.g. 2.10.1-dev1)"
+        description: "Image tag for images and chart appVersion (e.g. 2.10.3-dev1)"
         required: true
         type: string
-      atom_version:
-        description: "AtoM version to build into images when release_images is true (e.g. 2.10.1)"
+      atom_ref:
+        description: "AtoM source tag (v2.10.2) or full commit SHA when release_images is true"
         required: false
         default: ""
         type: string
@@ -50,7 +50,7 @@ jobs:
           RELEASE_IMAGES: ${{ inputs.release_images }}
           RELEASE_CHART: ${{ inputs.release_chart }}
           IMAGE_TAG: ${{ inputs.image_tag }}
-          ATOM_VERSION: ${{ inputs.atom_version }}
+          ATOM_REF: ${{ inputs.atom_ref }}
           CHART_VERSION: ${{ inputs.chart_version }}
         run: |
           if [[ "${RELEASE_IMAGES}" != "true" && "${RELEASE_CHART}" != "true" ]]; then
@@ -58,8 +58,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "${RELEASE_IMAGES}" == "true" && -z "${ATOM_VERSION}" ]]; then
-            echo "atom_version is required when release_images is true." >&2
+          if [[ "${RELEASE_IMAGES}" == "true" && -z "${ATOM_REF}" ]]; then
+            echo "atom_ref is required when release_images is true." >&2
+            exit 1
+          fi
+
+          if [[ "${RELEASE_IMAGES}" == "true" && ! "${ATOM_REF}" =~ ^([0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "atom_ref must be a full commit SHA or a version tag (e.g. v2.10.2)." >&2
             exit 1
           fi
 
@@ -180,7 +185,7 @@ jobs:
           provenance: false
           sbom: false
           build-args: |
-            ATOM_VERSION=${{ inputs.atom_version }}
+            ATOM_REF=${{ inputs.atom_ref }}
           outputs: type=image,name=${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
 
       - name: "Export GHCR digest"
@@ -313,7 +318,7 @@ jobs:
           RELEASE_IMAGES: ${{ inputs.release_images }}
           RELEASE_CHART: ${{ inputs.release_chart }}
           IMAGE_TAG: ${{ inputs.image_tag }}
-          ATOM_VERSION: ${{ inputs.atom_version }}
+          ATOM_REF: ${{ inputs.atom_ref }}
           CHART_VERSION: ${{ inputs.chart_version }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -329,7 +334,7 @@ jobs:
 
           artifact-family: images
           image-tag: ${IMAGE_TAG}
-          atom-version: ${ATOM_VERSION}
+          atom-ref: ${ATOM_REF}
           images:
           - ${GHCR_NAMESPACE}/atbox-public:${IMAGE_TAG}
           - ${GHCR_NAMESPACE}/atbox-admin:${IMAGE_TAG}
