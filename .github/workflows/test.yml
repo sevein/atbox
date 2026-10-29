@@ -15,7 +15,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3
+        uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3 # v3
       - name: Lint chart presets
         run: |
           nix develop --command helm lint charts/atbox --values charts/atbox/values-readonly-attached.yaml
@@ -51,7 +51,7 @@ jobs:
           docker compose -p "${PROJECT_NAME}" -f hack/integration/docker-compose.yml logs --no-color > hack/integration/output/compose-logs.txt || true
       - name: Upload integration artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2
         with:
           name: integration-output
           path: hack/integration/output
